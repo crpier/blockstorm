@@ -1,4 +1,4 @@
-use blockbuster::{t, Piece, RelPoint};
+use blockbuster::{i, j, t, Piece, RelPoint};
 
 #[derive(Default, Debug)]
 struct Game {
@@ -75,17 +75,9 @@ impl Game {
 
 fn main() {
     let mut game = Game::default();
-    game.add_piece(t());
+    game.add_piece(j());
+    // game.lower_piece().unwrap();
     // game.rotate_piece(false);
-    // game.lower_piece().unwrap();
-    // game.lower_piece().unwrap();
-    // game.lower_piece().unwrap();
-    // game.lower_piece().unwrap();
-    // game.lower_piece().unwrap();
-    // game.lower_piece().unwrap();
-    // game.lower_piece().unwrap();
-    // game.lower_piece().unwrap();
-    // game.lower_piece().unwrap();
     for line in game.playfield.iter() {
         println!("{:?}", line);
     }
