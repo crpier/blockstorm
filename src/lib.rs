@@ -79,3 +79,29 @@ pub fn j() -> Piece {
         positions: [pos_0, pos_1, pos_2, pos_3],
     }
 }
+
+// L
+pub fn l() -> Piece {
+    let center = Point(1, 4);
+    let pos_0: [RelPoint; 3] = [RelPoint(0, -1), RelPoint(0, 1), RelPoint(-1, 1)];
+    let pos_1: [RelPoint; 3] = [RelPoint(-1, -1), RelPoint(-1, 0), RelPoint(1, 0)];
+    let pos_2: [RelPoint; 3] = [RelPoint(1, -1), RelPoint(0, -1), RelPoint(0, 1)];
+    let pos_3: [RelPoint; 3] = [RelPoint(-1, 0), RelPoint(1, 0), RelPoint(1, 1)];
+    Piece {
+        center,
+        positions: [pos_0, pos_1, pos_2, pos_3],
+    }
+}
+
+// O
+pub fn o() -> Piece {
+    let center = Point(1, 4);
+    let pos_0: [RelPoint; 3] = [RelPoint(-1, 0), RelPoint(0, 1), RelPoint(-1, 1)];
+    let pos_1: [RelPoint; 3] = [RelPoint(-1, 0), RelPoint(0, 1), RelPoint(-1, 1)];
+    let pos_2: [RelPoint; 3] = [RelPoint(-1, 0), RelPoint(0, 1), RelPoint(-1, 1)];
+    let pos_3: [RelPoint; 3] = [RelPoint(-1, 0), RelPoint(0, 1), RelPoint(-1, 1)];
+    Piece {
+        center,
+        positions: [pos_0, pos_1, pos_2, pos_3],
+    }
+}
