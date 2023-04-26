@@ -119,7 +119,7 @@ impl Game {
 
 fn main() {
     let mut game = Game::default();
-    game.add_piece(s());
+    game.add_piece(z());
     // game.move_piece(RIGHT).unwrap();
     // game.move_piece(RIGHT).unwrap();
     // game.move_piece(DOWN).unwrap();

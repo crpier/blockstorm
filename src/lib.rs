@@ -43,11 +43,11 @@ impl Piece {
 
 // I
 pub fn i() -> Piece {
-    let center = Point(0, 4);
-    let pos_0: [RelPoint; 3] = [RelPoint(0, -1), RelPoint(0, 1), RelPoint(0, 2)];
-    let pos_1: [RelPoint; 3] = [RelPoint(-1, 0), RelPoint(1, 0), RelPoint(2, 0)];
-    let pos_2: [RelPoint; 3] = [RelPoint(0, -1), RelPoint(0, 1), RelPoint(0, 2)];
-    let pos_3: [RelPoint; 3] = [RelPoint(-1, 0), RelPoint(1, 0), RelPoint(2, 0)];
+    let center = Point(1, 5);
+    let pos_0: [RelPoint; 3] = [RelPoint(0, -2), RelPoint(0, -1), RelPoint(0, 1)];
+    let pos_1: [RelPoint; 3] = [RelPoint(-2, 0), RelPoint(-1, 0), RelPoint(1, 0)];
+    let pos_2: [RelPoint; 3] = [RelPoint(0, -2), RelPoint(0, -1), RelPoint(0, 1)];
+    let pos_3: [RelPoint; 3] = [RelPoint(-2, 0), RelPoint(-1, 0), RelPoint(1, 0)];
     Piece {
         center,
         positions: [pos_0, pos_1, pos_2, pos_3],
@@ -57,10 +57,10 @@ pub fn i() -> Piece {
 // J
 pub fn j() -> Piece {
     let center = Point(1, 4);
-    let pos_0: [RelPoint; 3] = [RelPoint(-1, -1), RelPoint(0, -1), RelPoint(0, 1)];
-    let pos_1: [RelPoint; 3] = [RelPoint(-1, 0), RelPoint(1, 0), RelPoint(1, -1)];
-    let pos_2: [RelPoint; 3] = [RelPoint(0, -1), RelPoint(0, 1), RelPoint(1, 1)];
-    let pos_3: [RelPoint; 3] = [RelPoint(-1, 1), RelPoint(-1, 0), RelPoint(1, 0)];
+    let pos_0: [RelPoint; 3] = [RelPoint(0, -1), RelPoint(0, 1), RelPoint(-1, 1)];
+    let pos_1: [RelPoint; 3] = [RelPoint(-1, -1), RelPoint(-1, 0), RelPoint(1, 0)];
+    let pos_2: [RelPoint; 3] = [RelPoint(1, -1), RelPoint(0, -1), RelPoint(0, 1)];
+    let pos_3: [RelPoint; 3] = [RelPoint(-1, 0), RelPoint(1, 0), RelPoint(1, 1)];
     Piece {
         center,
         positions: [pos_0, pos_1, pos_2, pos_3],
@@ -70,10 +70,10 @@ pub fn j() -> Piece {
 // L
 pub fn l() -> Piece {
     let center = Point(1, 4);
-    let pos_0: [RelPoint; 3] = [RelPoint(0, -1), RelPoint(0, 1), RelPoint(-1, 1)];
-    let pos_1: [RelPoint; 3] = [RelPoint(-1, -1), RelPoint(-1, 0), RelPoint(1, 0)];
-    let pos_2: [RelPoint; 3] = [RelPoint(1, -1), RelPoint(0, -1), RelPoint(0, 1)];
-    let pos_3: [RelPoint; 3] = [RelPoint(-1, 0), RelPoint(1, 0), RelPoint(1, 1)];
+    let pos_0: [RelPoint; 3] = [RelPoint(-1, -1), RelPoint(0, -1), RelPoint(0, 1)];
+    let pos_1: [RelPoint; 3] = [RelPoint(-1, 0), RelPoint(1, 0), RelPoint(1, -1)];
+    let pos_2: [RelPoint; 3] = [RelPoint(0, -1), RelPoint(0, 1), RelPoint(1, 1)];
+    let pos_3: [RelPoint; 3] = [RelPoint(-1, 1), RelPoint(-1, 0), RelPoint(1, 0)];
     Piece {
         center,
         positions: [pos_0, pos_1, pos_2, pos_3],
@@ -95,10 +95,10 @@ pub fn o() -> Piece {
 
 // S
 pub fn s() -> Piece {
-    let center = Point(1, 4);
-    let pos_0: [RelPoint; 3] = [RelPoint(-1, 1), RelPoint(-1, 0), RelPoint(0, -1)];
-    let pos_1: [RelPoint; 3] = [RelPoint(-1, -1), RelPoint(0, -1), RelPoint(1, 0)];
-    let pos_2: [RelPoint; 3] = [RelPoint(0, 1), RelPoint(1, 0), RelPoint(1, -1)];
+    let center = Point(0, 4);
+    let pos_0: [RelPoint; 3] = [RelPoint(1, -1), RelPoint(1, 0), RelPoint(0, 1)];
+    let pos_1: [RelPoint; 3] = [RelPoint(-1, 0), RelPoint(0, 1), RelPoint(1, 1)];
+    let pos_2: [RelPoint; 3] = [RelPoint(1, -1), RelPoint(1, 0), RelPoint(0, 1)];
     let pos_3: [RelPoint; 3] = [RelPoint(-1, 0), RelPoint(0, 1), RelPoint(1, 1)];
     Piece {
         center,
@@ -121,9 +121,9 @@ pub fn t() -> Piece {
 
 // Z
 pub fn z() -> Piece {
-    let center = Point(1, 4);
-    let pos_0: [RelPoint; 3] = [RelPoint(-1, -1), RelPoint(-1, 0), RelPoint(0, 1)];
-    let pos_1: [RelPoint; 3] = [RelPoint(-1, 0), RelPoint(0, -1), RelPoint(1, -1)];
+    let center = Point(0, 4);
+    let pos_0: [RelPoint; 3] = [RelPoint(0, -1), RelPoint(1, 0), RelPoint(1, 1)];
+    let pos_1: [RelPoint; 3] = [RelPoint(-1, 1), RelPoint(0, 1), RelPoint(1, 0)];
     let pos_2: [RelPoint; 3] = [RelPoint(0, -1), RelPoint(1, 0), RelPoint(1, 1)];
     let pos_3: [RelPoint; 3] = [RelPoint(-1, 1), RelPoint(0, 1), RelPoint(1, 0)];
     Piece {
