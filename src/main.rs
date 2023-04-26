@@ -39,10 +39,10 @@ const RIGHT: TetrisDirection = TetrisDirection::Right;
 
 impl Game {
     pub fn add_piece(&mut self, piece: Piece) {
-        self.playfield[piece.center.0][piece.center.1] = 1;
+        self.playfield[piece.center.0][piece.center.1] = piece.color;
         for point in piece.positions[0].iter() {
             self.playfield[(point.0 + piece.center.0 as i64) as usize]
-                [(point.1 + piece.center.1 as i64) as usize] = 1;
+                [(point.1 + piece.center.1 as i64) as usize] = piece.color;
         }
         self.moving_piece_rotation = 0;
         self.moving_piece = Some(piece);
@@ -75,9 +75,9 @@ impl Game {
             new_positions[id] = RelPoint(new_x as i64, new_y as i64);
         }
         for new_position in new_positions.iter() {
-            self.playfield[new_position.0 as usize][new_position.1 as usize] = 1;
+            self.playfield[new_position.0 as usize][new_position.1 as usize] = piece.color;
         }
-        self.playfield[piece.center.0][piece.center.1] = 1;
+        self.playfield[piece.center.0][piece.center.1] = piece.color;
         Ok(())
     }
 
@@ -119,7 +119,7 @@ impl Game {
 
 fn main() {
     let mut game = Game::default();
-    game.add_piece(z());
+    game.add_piece(i());
     // game.move_piece(RIGHT).unwrap();
     // game.move_piece(RIGHT).unwrap();
     // game.move_piece(DOWN).unwrap();
@@ -146,8 +146,14 @@ fn main() {
                     Row::new(row.map(|el| {
                         let color = match el {
                             0 => Color::Black,
-                            1 => Color::Red,
-                            _ => Color::LightRed,
+                            1 => Color::Cyan,
+                            2 => Color::Blue,
+                            3 => Color::Red,
+                            4 => Color::Yellow,
+                            5 => Color::Green,
+                            6 => Color::Magenta,
+                            7 => Color::LightRed,
+                            _ => Color::White,
                         };
                         Cell::from("").style(Style::default().bg(color))
                     }))

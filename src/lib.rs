@@ -30,6 +30,7 @@ impl Add for Point {
 pub struct Piece {
     pub center: Point,
     pub positions: [[RelPoint; 3]; 4],
+    pub color: i16,
 }
 
 impl Piece {
@@ -51,6 +52,7 @@ pub fn i() -> Piece {
     Piece {
         center,
         positions: [pos_0, pos_1, pos_2, pos_3],
+        color: 1,
     }
 }
 
@@ -64,6 +66,7 @@ pub fn j() -> Piece {
     Piece {
         center,
         positions: [pos_0, pos_1, pos_2, pos_3],
+        color: 2,
     }
 }
 
@@ -77,6 +80,7 @@ pub fn l() -> Piece {
     Piece {
         center,
         positions: [pos_0, pos_1, pos_2, pos_3],
+        color: 3,
     }
 }
 
@@ -90,6 +94,7 @@ pub fn o() -> Piece {
     Piece {
         center,
         positions: [pos_0, pos_1, pos_2, pos_3],
+        color: 4,
     }
 }
 
@@ -103,6 +108,7 @@ pub fn s() -> Piece {
     Piece {
         center,
         positions: [pos_0, pos_1, pos_2, pos_3],
+        color: 5,
     }
 }
 
@@ -116,6 +122,7 @@ pub fn t() -> Piece {
     Piece {
         center,
         positions: [pos_0, pos_1, pos_2, pos_3],
+        color: 6,
     }
 }
 
@@ -129,5 +136,6 @@ pub fn z() -> Piece {
     Piece {
         center,
         positions: [pos_0, pos_1, pos_2, pos_3],
+        color: 7,
     }
 }
