@@ -1,4 +1,7 @@
-use std::{error, io};
+use std::{
+    error::{self, Error},
+    fmt, io,
+};
 use termion::raw::RawTerminal;
 use tui::{
     backend::TermionBackend,
@@ -8,18 +11,53 @@ use tui::{
     Terminal,
 };
 
-#[derive(Debug, Default)]
-pub struct CenterPoint(pub usize, pub usize);
+pub enum TetrisDirection {
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
+impl TetrisDirection {
+    pub fn opposite_direction(&self) -> TetrisDirection {
+        match self {
+            TetrisDirection::Up => TetrisDirection::Down,
+            TetrisDirection::Down => TetrisDirection::Up,
+            TetrisDirection::Left => TetrisDirection::Right,
+            TetrisDirection::Right => TetrisDirection::Left,
+        }
+    }
+}
+
+// const CLOCKWISE: Rotation = Rotation::Clockwise;
+pub const COUNTER_CLOCKWISE: Rotation = Rotation::CounterClockwise;
+// const UP: TetrisDirection = TetrisDirection::Up;
+pub const DOWN: TetrisDirection = TetrisDirection::Down;
+pub const LEFT: TetrisDirection = TetrisDirection::Left;
+pub const RIGHT: TetrisDirection = TetrisDirection::Right;
+
+#[derive(Debug, Default, Clone, Copy)]
+pub struct Point(pub usize, pub usize);
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct RelPoint(pub i16, pub i16);
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Piece {
-    center: CenterPoint,
-    current_rotation_id: u8,
+    center: Point,
+    current_rotation_id: usize,
     rotations: [[RelPoint; 3]; 4],
     pub color: i16,
+}
+
+#[derive(Debug, Default)]
+pub struct OutOfBoundsError;
+
+impl Error for OutOfBoundsError {}
+impl fmt::Display for OutOfBoundsError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Out of bounds")
+    }
 }
 
 pub enum PieceType {
@@ -32,9 +70,10 @@ pub enum PieceType {
     T,
     Z,
 }
+
 impl Piece {
     pub fn new(piece_type: PieceType) -> Piece {
-        let center: CenterPoint;
+        let center: Point;
         let pos_0: [RelPoint; 3];
         let pos_1: [RelPoint; 3];
         let pos_2: [RelPoint; 3];
@@ -43,7 +82,7 @@ impl Piece {
 
         match piece_type {
             PieceType::I => {
-                center = CenterPoint(1, 5);
+                center = Point(1, 5);
                 pos_0 = [RelPoint(0, -2), RelPoint(0, -1), RelPoint(0, 1)];
                 pos_1 = [RelPoint(-2, 0), RelPoint(-1, 0), RelPoint(1, 0)];
                 pos_2 = [RelPoint(0, -2), RelPoint(0, -1), RelPoint(0, 1)];
@@ -51,7 +90,7 @@ impl Piece {
                 color = 1;
             }
             PieceType::J => {
-                center = CenterPoint(1, 5);
+                center = Point(1, 5);
                 pos_0 = [RelPoint(0, -1), RelPoint(0, 1), RelPoint(-1, 1)];
                 pos_1 = [RelPoint(-1, -1), RelPoint(-1, 0), RelPoint(1, 0)];
                 pos_2 = [RelPoint(0, -1), RelPoint(0, 1), RelPoint(-1, 1)];
@@ -59,7 +98,7 @@ impl Piece {
                 color = 2;
             }
             PieceType::L => {
-                center = CenterPoint(1, 4);
+                center = Point(1, 4);
                 pos_0 = [RelPoint(-1, -1), RelPoint(0, -1), RelPoint(0, 1)];
                 pos_1 = [RelPoint(-1, 0), RelPoint(1, 0), RelPoint(1, -1)];
                 pos_2 = [RelPoint(-1, -1), RelPoint(0, -1), RelPoint(0, 1)];
@@ -67,7 +106,7 @@ impl Piece {
                 color = 3;
             }
             PieceType::O => {
-                center = CenterPoint(1, 4);
+                center = Point(1, 4);
                 pos_0 = [RelPoint(-1, 0), RelPoint(0, 1), RelPoint(-1, 1)];
                 pos_1 = [RelPoint(-1, 0), RelPoint(0, 1), RelPoint(-1, 1)];
                 pos_2 = [RelPoint(-1, 0), RelPoint(0, 1), RelPoint(-1, 1)];
@@ -75,7 +114,7 @@ impl Piece {
                 color = 4;
             }
             PieceType::S => {
-                center = CenterPoint(0, 4);
+                center = Point(0, 4);
                 pos_0 = [RelPoint(1, -1), RelPoint(1, 0), RelPoint(0, 1)];
                 pos_1 = [RelPoint(-1, 0), RelPoint(0, 1), RelPoint(1, 1)];
                 pos_2 = [RelPoint(1, -1), RelPoint(1, 0), RelPoint(0, 1)];
@@ -83,7 +122,7 @@ impl Piece {
                 color = 5;
             }
             PieceType::T => {
-                center = CenterPoint(1, 4);
+                center = Point(1, 4);
                 pos_0 = [RelPoint(-1, 0), RelPoint(0, -1), RelPoint(0, 1)];
                 pos_1 = [RelPoint(-1, 0), RelPoint(0, -1), RelPoint(1, 0)];
                 pos_2 = [RelPoint(0, -1), RelPoint(1, 0), RelPoint(0, 1)];
@@ -91,7 +130,7 @@ impl Piece {
                 color = 6;
             }
             PieceType::Z => {
-                center = CenterPoint(0, 4);
+                center = Point(0, 4);
                 pos_0 = [RelPoint(0, -1), RelPoint(1, 0), RelPoint(1, 1)];
                 pos_1 = [RelPoint(-1, 1), RelPoint(0, 1), RelPoint(1, 0)];
                 pos_2 = [RelPoint(0, -1), RelPoint(1, 0), RelPoint(1, 1)];
@@ -106,112 +145,146 @@ impl Piece {
             color,
         }
     }
-    pub fn move_piece(&mut self, move_x: i16, move_y: i16) {
-        let new_center_x = (self.center.0 as i16 + move_x) as usize;
-        let new_center_y = (self.center.1 as i16 + move_y) as usize;
-        self.center.0 = new_center_x;
-        self.center.1 = new_center_y;
+
+    pub fn get_piece_points(&self) -> Result<[Point; 4], OutOfBoundsError> {
+        let mut points = [Point(0, 0); 4];
+        let current_rotation = self.rotations[self.current_rotation_id];
+        for i in 0..3 {
+            let rel_point = current_rotation[i];
+            if self.center.0 as i16 + rel_point.0 < 0 {
+                return Err(OutOfBoundsError);
+            }
+            let point = Point(
+                (self.center.0 as i16 + rel_point.0) as usize,
+                (self.center.1 as i16 + rel_point.1) as usize,
+            );
+            points[i] = point;
+        }
+        points[3] = self.center;
+        Ok(points)
+    }
+
+    fn move_piece_by(&mut self, x: i16, y: i16) {
+        self.center = Point(
+            (self.center.0 as i16 + x) as usize,
+            (self.center.1 as i16 + y) as usize,
+        );
+    }
+
+    pub fn move_piece(&mut self, direction: &TetrisDirection) {
+        match direction {
+            TetrisDirection::Up => {
+                self.move_piece_by(-1, 0);
+            }
+            TetrisDirection::Down => {
+                self.move_piece_by(1, 0);
+            }
+            TetrisDirection::Left => {
+                self.move_piece_by(0, -1);
+            }
+            TetrisDirection::Right => {
+                self.move_piece_by(0, 1);
+            }
+        }
+    }
+
+    pub fn rotate_piece(&mut self, rotation: &Rotation) {
+        match rotation {
+            Rotation::CounterClockwise => {
+                self.current_rotation_id = (self.current_rotation_id + 1) % 4;
+            }
+            Rotation::Clockwise => {
+                if self.current_rotation_id == 0 {
+                    // can't do modulo because current_rotation_id is unsigned
+                    self.current_rotation_id = 3;
+                } else {
+                    self.current_rotation_id -= 1;
+                }
+            }
+        }
+    }
+}
+
+pub enum Rotation {
+    Clockwise,
+    CounterClockwise,
+}
+
+impl Rotation {
+    pub fn other_direction(&self) -> Rotation {
+        match self {
+            Rotation::Clockwise => Rotation::CounterClockwise,
+            Rotation::CounterClockwise => Rotation::Clockwise,
+        }
     }
 }
 
 #[derive(Default, Debug)]
 pub struct Game {
     pub playfield: [[i16; 10]; 11],
-    pub moving_piece: Option<Piece>,
+    pub moving_piece: Piece,
+    // TODO: remove this field
     pub moving_piece_rotation: usize,
     // next_piece: Option<Piece>,
     // hold_piece: Option<Piece>,
 }
 
-pub enum Rotation {
-    // Clockwise,
-    CounterClockwise,
-}
-
-pub enum TetrisDirection {
-    // Up,
-    Down,
-    Left,
-    Right,
-}
-
-// const CLOCKWISE: Rotation = Rotation::Clockwise;
-pub const COUNTER_CLOCKWISE: Rotation = Rotation::CounterClockwise;
-// const UP: TetrisDirection = TetrisDirection::Up;
-pub const DOWN: TetrisDirection = TetrisDirection::Down;
-pub const LEFT: TetrisDirection = TetrisDirection::Left;
-pub const RIGHT: TetrisDirection = TetrisDirection::Right;
-
 impl Game {
-    pub fn add_piece(&mut self, piece: Piece) {
-        self.playfield[piece.center.0][piece.center.1] = piece.color;
-        for point in piece.rotations[0].iter() {
-            self.playfield[(point.0 + piece.center.0 as i16) as usize]
-                [(point.1 + piece.center.1 as i16) as usize] = piece.color;
-        }
-        self.moving_piece_rotation = 0;
-        self.moving_piece = Some(piece);
-    }
-    fn clear_piece_location(&mut self) {
-        let piece = self.moving_piece.as_mut().unwrap();
-        self.playfield[piece.center.0][piece.center.1] = 0;
-        for point in piece.rotations[self.moving_piece_rotation].iter() {
-            self.playfield[(point.0 + piece.center.0 as i16) as usize]
-                [(point.1 + piece.center.1 as i16) as usize] = 0;
+    fn fill_piece_points(&mut self) {
+        let piece_points = self.moving_piece.get_piece_points().unwrap();
+        for point in piece_points.iter() {
+            self.playfield[point.0][point.1] = self.moving_piece.color;
         }
     }
 
-    fn update_piece_location(&mut self) -> Result<(), &str> {
-        let piece = self.moving_piece.as_mut().unwrap();
-        let mut new_positions: [RelPoint; 3] = [
-            RelPoint::default(),
-            RelPoint::default(),
-            RelPoint::default(),
-        ];
-        for (id, point) in piece.rotations[self.moving_piece_rotation]
-            .iter()
-            .enumerate()
-        {
-            let new_x = (point.0 + piece.center.0 as i16) as usize;
-            let new_y = (point.1 + piece.center.1 as i16) as usize;
-            if new_x > self.playfield.len() - 1 || new_y > self.playfield[0].len() - 1 {
-                return Err("Not enough room to move piece");
-            }
-            new_positions[id] = RelPoint(new_x as i16, new_y as i16);
+    fn clear_piece_points(&mut self) {
+        let piece_points = self.moving_piece.get_piece_points().unwrap();
+        for point in piece_points.iter() {
+            self.playfield[point.0][point.1] = 0;
         }
-        for new_position in new_positions.iter() {
-            self.playfield[new_position.0 as usize][new_position.1 as usize] = piece.color;
-        }
-        self.playfield[piece.center.0][piece.center.1] = piece.color;
-        Ok(())
     }
 
-    pub fn rotate_piece(&mut self, direction: Rotation) {
-        self.clear_piece_location();
-        match direction {
-            // Rotation::Clockwise => {
-            //     if self.moving_piece_rotation == 0 {
-            //         self.moving_piece_rotation = 3
-            //     } else {
-            //         self.moving_piece_rotation = self.moving_piece_rotation - 1
-            //     }
-            // }
-            Rotation::CounterClockwise => {
-                self.moving_piece_rotation = (self.moving_piece_rotation + 1) % 4
+    fn moving_piece_is_within_bounds(&self) -> bool {
+        let piece_points = match self.moving_piece.get_piece_points() {
+            Ok(points) => points,
+            Err(_) => return false,
+        };
+
+        for point in piece_points.iter() {
+            if point.0 >= self.playfield.len() || point.1 >= self.playfield[0].len() {
+                return false;
             }
         }
-        // TODO: implement wall kicks here
-        self.update_piece_location().unwrap();
+        return true;
     }
 
-    pub fn move_piece(&mut self, direction: TetrisDirection) -> Result<(), Box<dyn error::Error>> {
-        self.clear_piece_location();
-        match direction {
-            TetrisDirection::Down => self.moving_piece.as_mut().unwrap().move_piece(1, 0),
-            TetrisDirection::Left => self.moving_piece.as_mut().unwrap().move_piece(0, -1),
-            TetrisDirection::Right => self.moving_piece.as_mut().unwrap().move_piece(0, 1),
+    pub fn add_piece_to_field(&mut self, piece: Piece) {
+        self.fill_piece_points();
+        self.moving_piece = piece;
+    }
+
+    pub fn rotate_moving_piece(&mut self, direction: &Rotation) -> Result<(), OutOfBoundsError> {
+        self.clear_piece_points();
+        self.moving_piece.rotate_piece(direction);
+        if !self.moving_piece_is_within_bounds() {
+            self.moving_piece.rotate_piece(&direction.other_direction());
+            self.fill_piece_points();
+            return Err(OutOfBoundsError);
         }
-        self.update_piece_location()?;
+        self.fill_piece_points();
+        return Ok(());
+    }
+
+    pub fn move_piece(&mut self, direction: TetrisDirection) -> Result<(), OutOfBoundsError> {
+        self.clear_piece_points();
+        self.moving_piece.move_piece(&direction);
+        if !self.moving_piece_is_within_bounds() {
+            self.moving_piece
+                .move_piece(&direction.opposite_direction());
+            self.fill_piece_points();
+            return Err(OutOfBoundsError);
+        }
+        self.fill_piece_points();
         return Ok(());
     }
 }
@@ -224,7 +297,9 @@ pub fn draw_game(
         let field = game.playfield.map(|row| {
             Row::new(row.map(|el| {
                 let color = match el {
+                    // Empty tile
                     0 => Color::Black,
+                    // Pieces
                     1 => Color::Cyan,
                     2 => Color::Blue,
                     3 => Color::Red,
@@ -232,6 +307,7 @@ pub fn draw_game(
                     5 => Color::Green,
                     6 => Color::Magenta,
                     7 => Color::LightRed,
+                    // Pieces already placed
                     8 => Color::DarkGray,
                     _ => Color::White,
                 };
