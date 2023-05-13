@@ -5,7 +5,7 @@ use tui::{backend::TermionBackend, Terminal};
 
 fn main() {
     let mut game = Game::default();
-    game.add_piece_to_field(Piece::new(PieceType::I));
+    game.add_piece_to_field(Piece::new(PieceType::T));
     // game.move_piece(DOWN).unwrap();
     // game.move_piece(DOWN).unwrap();
     // for line in game.playfield.iter() {
@@ -19,16 +19,16 @@ fn main() {
         match event {
             Ok(Key::Char('q')) => break,
             Ok(Key::Char('j')) => {
-                game.move_piece(DOWN).unwrap();
+                game.move_moving_piece(DOWN).unwrap();
             }
             Ok(Key::Char('k')) => {
                 game.rotate_moving_piece(&COUNTER_CLOCKWISE).unwrap();
             }
             Ok(Key::Char('h')) => {
-                game.move_piece(LEFT).unwrap();
+                game.move_moving_piece(LEFT).unwrap();
             }
             Ok(Key::Char('l')) => {
-                game.move_piece(RIGHT).unwrap();
+                game.move_moving_piece(RIGHT).unwrap();
             }
             _ => (),
         }

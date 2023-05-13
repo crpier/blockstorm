@@ -17,7 +17,6 @@ pub enum TetrisDirection {
     Left,
     Right,
 }
-
 impl TetrisDirection {
     pub fn opposite_direction(&self) -> TetrisDirection {
         match self {
@@ -28,13 +27,25 @@ impl TetrisDirection {
         }
     }
 }
-
-// const CLOCKWISE: Rotation = Rotation::Clockwise;
-pub const COUNTER_CLOCKWISE: Rotation = Rotation::CounterClockwise;
-// const UP: TetrisDirection = TetrisDirection::Up;
 pub const DOWN: TetrisDirection = TetrisDirection::Down;
 pub const LEFT: TetrisDirection = TetrisDirection::Left;
 pub const RIGHT: TetrisDirection = TetrisDirection::Right;
+
+pub const KICKS: [(i16, i16); 5] = [(0, 0), (-1, 0), (-1, 1), (0, -2), (-1, -2)];
+
+pub enum Rotation {
+    Clockwise,
+    CounterClockwise,
+}
+impl Rotation {
+    pub fn other_direction(&self) -> Rotation {
+        match self {
+            Rotation::Clockwise => Rotation::CounterClockwise,
+            Rotation::CounterClockwise => Rotation::Clockwise,
+        }
+    }
+}
+pub const COUNTER_CLOCKWISE: Rotation = Rotation::CounterClockwise;
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Point(pub usize, pub usize);
@@ -43,16 +54,7 @@ pub struct Point(pub usize, pub usize);
 pub struct RelPoint(pub i16, pub i16);
 
 #[derive(Debug, Default)]
-pub struct Piece {
-    center: Point,
-    current_rotation_id: usize,
-    rotations: [[RelPoint; 3]; 4],
-    pub color: i16,
-}
-
-#[derive(Debug, Default)]
 pub struct OutOfBoundsError;
-
 impl Error for OutOfBoundsError {}
 impl fmt::Display for OutOfBoundsError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -60,6 +62,13 @@ impl fmt::Display for OutOfBoundsError {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct Piece {
+    center: Point,
+    current_rotation_id: usize,
+    rotations: [[RelPoint; 3]; 4],
+    pub color: i16,
+}
 pub enum PieceType {
     // Clockwise,
     I,
@@ -79,7 +88,6 @@ impl Piece {
         let pos_2: [RelPoint; 3];
         let pos_3: [RelPoint; 3];
         let color: i16;
-
         match piece_type {
             PieceType::I => {
                 center = Point(1, 5);
@@ -205,20 +213,6 @@ impl Piece {
     }
 }
 
-pub enum Rotation {
-    Clockwise,
-    CounterClockwise,
-}
-
-impl Rotation {
-    pub fn other_direction(&self) -> Rotation {
-        match self {
-            Rotation::Clockwise => Rotation::CounterClockwise,
-            Rotation::CounterClockwise => Rotation::Clockwise,
-        }
-    }
-}
-
 #[derive(Default, Debug)]
 pub struct Game {
     pub playfield: [[i16; 10]; 11],
@@ -264,18 +258,28 @@ impl Game {
     }
 
     pub fn rotate_moving_piece(&mut self, direction: &Rotation) -> Result<(), OutOfBoundsError> {
+        let mut ok = false;
         self.clear_piece_points();
-        self.moving_piece.rotate_piece(direction);
-        if !self.moving_piece_is_within_bounds() {
+        for (kick_x, kick_y) in KICKS.iter() {
+            self.moving_piece.move_piece_by(*kick_x, *kick_y);
+            self.moving_piece.rotate_piece(direction);
+            if self.moving_piece_is_within_bounds() {
+                ok = true;
+                break;
+            }
             self.moving_piece.rotate_piece(&direction.other_direction());
-            self.fill_piece_points();
-            return Err(OutOfBoundsError);
         }
         self.fill_piece_points();
+        if !ok {
+            return Err(OutOfBoundsError);
+        }
         return Ok(());
     }
 
-    pub fn move_piece(&mut self, direction: TetrisDirection) -> Result<(), OutOfBoundsError> {
+    pub fn move_moving_piece(
+        &mut self,
+        direction: TetrisDirection,
+    ) -> Result<(), OutOfBoundsError> {
         self.clear_piece_points();
         self.moving_piece.move_piece(&direction);
         if !self.moving_piece_is_within_bounds() {
