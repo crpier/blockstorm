@@ -5,7 +5,7 @@ use tui::{backend::TermionBackend, Terminal};
 
 fn main() {
     let mut game = Game::default();
-    game.add_piece_to_field(Piece::new(PieceType::I));
+    game.add_piece_to_field(Piece::new(PieceType::T));
     game.move_moving_piece(DOWN).unwrap();
     game.move_moving_piece(DOWN).unwrap();
     game.move_moving_piece(DOWN).unwrap();
@@ -15,7 +15,7 @@ fn main() {
     game.move_moving_piece(DOWN).unwrap();
     game.move_moving_piece(DOWN).unwrap();
     game.move_moving_piece(DOWN).unwrap();
-    game.move_moving_piece(LEFT).unwrap();
+    game.hard_drop_moving_piece();
 
     let stdout = io::stdout().into_raw_mode().unwrap();
     let backend = TermionBackend::new(stdout);
@@ -50,7 +50,7 @@ fn main() {
                 };
             }
             Ok(Key::Char('d')) => {
-                game.place_moving_piece();
+                game.hard_drop_moving_piece();
             }
 
             _ => (),

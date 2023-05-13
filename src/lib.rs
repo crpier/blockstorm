@@ -240,7 +240,7 @@ impl Piece {
 pub struct Game {
     pub playfield: [[i16; 10]; 11],
     pub moving_piece: Piece,
-    pub ghost_piece: Piece,
+    pub ghost_piece: Option<Piece>,
     // next_piece: Option<Piece>,
     // hold_piece: Option<Piece>,
 }
@@ -257,17 +257,6 @@ impl Game {
         Ok(())
     }
 
-    fn fill_ghost_piece_points(&mut self, piece: &Piece) -> Result<(), OutOfBoundsError> {
-        let piece_points = piece.get_piece_points().unwrap();
-        for point in piece_points.iter() {
-            if point.0 < 0 || point.1 < 0 {
-                return Err(OutOfBoundsError);
-            }
-            self.playfield[point.0 as usize][point.1 as usize] += piece.color;
-        }
-        Ok(())
-    }
-
     fn clear_piece_points(&mut self, piece: &Piece) -> Result<(), OutOfBoundsError> {
         let piece_points = piece.get_piece_points().unwrap();
         for point in piece_points.iter() {
@@ -275,17 +264,6 @@ impl Game {
                 return Err(OutOfBoundsError);
             }
             self.playfield[point.0 as usize][point.1 as usize] = 0;
-        }
-        Ok(())
-    }
-
-    fn clear_ghost_piece_points(&mut self, piece: &Piece) -> Result<(), OutOfBoundsError> {
-        let piece_points = piece.get_piece_points().unwrap();
-        for point in piece_points.iter() {
-            if point.0 < 0 || point.1 < 0 {
-                return Err(OutOfBoundsError);
-            }
-            self.playfield[point.0 as usize][point.1 as usize] -= piece.color;
         }
         Ok(())
     }
@@ -311,28 +289,6 @@ impl Game {
         return Ok(());
     }
 
-    fn ghost_piece_is_in_allowed_position(&self, piece: &Piece) -> Result<(), MinoesError> {
-        let piece_points = match piece.get_piece_points() {
-            Ok(points) => points,
-            Err(_) => return Err(MinoesError::OutOfBounds(OutOfBoundsError)),
-        };
-
-        for point in piece_points.iter() {
-            if point.0 < 0 || point.1 < 0 {
-                return Err(MinoesError::OutOfBounds(OutOfBoundsError));
-            }
-            if point.0 >= self.playfield.len() as i16 || point.1 >= self.playfield[0].len() as i16 {
-                return Err(MinoesError::OutOfBounds(OutOfBoundsError));
-            }
-            if self.playfield[point.0 as usize][point.1 as usize] > 0
-                && self.playfield[point.0 as usize][point.1 as usize] < 8
-            {
-                return Err(MinoesError::OverlappingMinoes(OverlappingMinoesError));
-            }
-        }
-        return Ok(());
-    }
-
     fn fill_field_with_dropped_points(&mut self, points: [Point; 4]) {
         for point in points.iter() {
             self.playfield[point.0 as usize][point.1 as usize] = 8;
@@ -340,28 +296,30 @@ impl Game {
     }
 
     fn update_ghost_piece(&mut self) {
-        self.clear_ghost_piece_points(&self.ghost_piece.clone())
-            .unwrap();
+        if let Some(ghost_piece) = &self.ghost_piece {
+            self.clear_piece_points(&ghost_piece.clone()).unwrap();
+        }
         let mut ghost_piece = self.moving_piece.clone();
         ghost_piece.color = -10;
         // Move the ghost piece down until it's in a valid position
         while let Err(MinoesError::OverlappingMinoes(OverlappingMinoesError)) =
-            self.ghost_piece_is_in_allowed_position(&ghost_piece)
+            self.piece_is_in_allowed_position(&ghost_piece)
         {
             ghost_piece.move_piece(&TetrisDirection::Down);
         }
         // Move the ghost piece down until it hits something
-        while let Ok(_) = self.ghost_piece_is_in_allowed_position(&ghost_piece) {
+        while let Ok(_) = self.piece_is_in_allowed_position(&ghost_piece) {
             ghost_piece.move_piece(&TetrisDirection::Down);
         }
         ghost_piece.move_piece(&TetrisDirection::Up);
-        self.fill_ghost_piece_points(&ghost_piece).unwrap();
-        self.ghost_piece = ghost_piece;
+        self.fill_piece_points(&ghost_piece).unwrap();
+        self.ghost_piece = Some(ghost_piece);
     }
 
     pub fn add_piece_to_field(&mut self, piece: Piece) {
         self.moving_piece = piece;
         self.fill_piece_points(&self.moving_piece.clone()).unwrap();
+        self.update_ghost_piece();
     }
 
     pub fn rotate_moving_piece(&mut self, direction: &Rotation) -> Result<(), OutOfBoundsError> {
@@ -376,11 +334,11 @@ impl Game {
             }
             self.moving_piece.rotate_piece(&direction.other_direction());
         }
+        self.update_ghost_piece();
         self.fill_piece_points(&self.moving_piece.clone()).unwrap();
         if !ok {
             return Err(OutOfBoundsError);
         }
-        self.update_ghost_piece();
         return Ok(());
     }
 
@@ -396,15 +354,24 @@ impl Game {
             self.fill_piece_points(&self.moving_piece.clone()).unwrap();
             return Err(OutOfBoundsError);
         }
-        self.fill_piece_points(&self.moving_piece.clone()).unwrap();
         self.update_ghost_piece();
+        self.fill_piece_points(&self.moving_piece.clone()).unwrap();
         return Ok(());
     }
 
     pub fn place_moving_piece(&mut self) {
         self.clear_piece_points(&self.moving_piece.clone()).unwrap();
         let piece_points = self.moving_piece.get_piece_points().unwrap();
+        self.ghost_piece = None;
         self.fill_field_with_dropped_points(piece_points);
+        self.add_piece_to_field(Piece::random_piece())
+    }
+
+    pub fn hard_drop_moving_piece(&mut self) {
+        self.clear_piece_points(&self.moving_piece.clone()).unwrap();
+        self.moving_piece = self.ghost_piece.clone().unwrap();
+        self.ghost_piece = None;
+        self.fill_field_with_dropped_points(self.moving_piece.get_piece_points().unwrap());
         self.add_piece_to_field(Piece::random_piece())
     }
 }
@@ -417,10 +384,6 @@ pub fn draw_game(
         let field = game.playfield.map(|row| {
             Row::new(row.map(|el| {
                 let color = match el {
-                    // Ghost piece
-                    n if n < 0 => Color::White,
-                    // Empty tile
-                    n if n.rem_euclid(10) == 0 => Color::Black,
                     // Pieces
                     n if n.rem_euclid(10) == 1 => Color::Cyan,
                     n if n.rem_euclid(10) == 2 => Color::Blue,
@@ -431,6 +394,10 @@ pub fn draw_game(
                     n if n.rem_euclid(10) == 7 => Color::LightRed,
                     // Pieces already placed
                     n if n.rem_euclid(10) == 8 => Color::DarkGray,
+                    // Ghost piece
+                    n if n < 0 => Color::White,
+                    // Empty tile
+                    n if n.rem_euclid(10) == 0 => Color::Black,
                     _ => Color::White,
                 };
                 Cell::from("").style(Style::default().bg(color))
