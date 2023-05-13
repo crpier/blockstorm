@@ -70,6 +70,7 @@ impl fmt::Display for OverlappingMinoesError {
         write!(f, "Out of bounds")
     }
 }
+#[derive(Debug)]
 pub enum MinoesError {
     OutOfBounds(OutOfBoundsError),
     OverlappingMinoes(OverlappingMinoesError),
@@ -246,11 +247,21 @@ pub struct Game {
 }
 
 impl Game {
-    fn fill_piece_points(&mut self, piece: &Piece) -> Result<(), OutOfBoundsError> {
+    fn fill_piece_points(&mut self, piece: &Piece) -> Result<(), MinoesError> {
         let piece_points = piece.get_piece_points().unwrap();
         for point in piece_points.iter() {
             if point.0 < 0 || point.1 < 0 {
-                return Err(OutOfBoundsError);
+                return Err(MinoesError::OutOfBounds(OutOfBoundsError));
+            }
+            if point.0 >= self.playfield.len() as i16 || point.1 >= self.playfield[0].len() as i16 {
+                return Err(MinoesError::OutOfBounds(OutOfBoundsError));
+            }
+            if self.playfield[point.0 as usize][point.1 as usize] == piece.color {
+                continue;
+            }
+
+            if self.playfield[point.0 as usize][point.1 as usize] > 0 {
+                return Err(MinoesError::OverlappingMinoes(OverlappingMinoesError));
             }
             self.playfield[point.0 as usize][point.1 as usize] = piece.color;
         }
@@ -262,6 +273,12 @@ impl Game {
         for point in piece_points.iter() {
             if point.0 < 0 || point.1 < 0 {
                 return Err(OutOfBoundsError);
+            }
+            if point.0 >= self.playfield.len() as i16 || point.1 >= self.playfield[0].len() as i16 {
+                return Err(OutOfBoundsError);
+            }
+            if self.playfield[point.0 as usize][point.1 as usize] != piece.color {
+                continue;
             }
             self.playfield[point.0 as usize][point.1 as usize] = 0;
         }
@@ -297,23 +314,37 @@ impl Game {
 
     fn update_ghost_piece(&mut self) {
         if let Some(ghost_piece) = &self.ghost_piece {
-            self.clear_piece_points(&ghost_piece.clone()).unwrap();
+            match self.clear_piece_points(&ghost_piece.clone()) {
+                Ok(_) => {}
+                Err(_) => {}
+            }
         }
         let mut ghost_piece = self.moving_piece.clone();
-        ghost_piece.color = -10;
+        ghost_piece.color = -1;
         // Move the ghost piece down until it's in a valid position
+        let mut retries = 0;
         while let Err(MinoesError::OverlappingMinoes(OverlappingMinoesError)) =
             self.piece_is_in_allowed_position(&ghost_piece)
         {
+            if retries > 4 {
+                break;
+            }
             ghost_piece.move_piece(&TetrisDirection::Down);
+            retries += 1;
         }
         // Move the ghost piece down until it hits something
         while let Ok(_) = self.piece_is_in_allowed_position(&ghost_piece) {
             ghost_piece.move_piece(&TetrisDirection::Down);
         }
         ghost_piece.move_piece(&TetrisDirection::Up);
-        self.fill_piece_points(&ghost_piece).unwrap();
+        match self.fill_piece_points(&ghost_piece) {
+            Ok(_) => {}
+            Err(_) => {}
+        }
         self.ghost_piece = Some(ghost_piece);
+        // Re-draw the moving piece, since we might have overwritten it
+        // While drawing the ghost piece, and then gave up
+        self.fill_piece_points(&self.moving_piece.clone()).unwrap();
     }
 
     pub fn add_piece_to_field(&mut self, piece: Piece) {
@@ -324,7 +355,8 @@ impl Game {
 
     pub fn rotate_moving_piece(&mut self, direction: &Rotation) -> Result<(), OutOfBoundsError> {
         let mut ok = false;
-        self.clear_piece_points(&self.moving_piece.clone()).unwrap();
+        let old_piece = self.moving_piece.clone();
+        self.clear_piece_points(&old_piece).unwrap();
         for (kick_x, kick_y) in KICKS.iter() {
             self.moving_piece.move_piece_by(*kick_x, *kick_y);
             self.moving_piece.rotate_piece(direction);
@@ -332,13 +364,15 @@ impl Game {
                 ok = true;
                 break;
             }
+            self.moving_piece.move_piece_by(-*kick_x, -*kick_y);
             self.moving_piece.rotate_piece(&direction.other_direction());
         }
-        self.update_ghost_piece();
-        self.fill_piece_points(&self.moving_piece.clone()).unwrap();
         if !ok {
+            self.fill_piece_points(&old_piece).unwrap();
             return Err(OutOfBoundsError);
         }
+        self.fill_piece_points(&self.moving_piece.clone()).unwrap();
+        self.update_ghost_piece();
         return Ok(());
     }
 
@@ -357,14 +391,6 @@ impl Game {
         self.update_ghost_piece();
         self.fill_piece_points(&self.moving_piece.clone()).unwrap();
         return Ok(());
-    }
-
-    pub fn place_moving_piece(&mut self) {
-        self.clear_piece_points(&self.moving_piece.clone()).unwrap();
-        let piece_points = self.moving_piece.get_piece_points().unwrap();
-        self.ghost_piece = None;
-        self.fill_field_with_dropped_points(piece_points);
-        self.add_piece_to_field(Piece::random_piece())
     }
 
     pub fn hard_drop_moving_piece(&mut self) {
