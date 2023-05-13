@@ -5,31 +5,54 @@ use tui::{backend::TermionBackend, Terminal};
 
 fn main() {
     let mut game = Game::default();
-    game.add_piece_to_field(Piece::new(PieceType::T));
-    // game.move_piece(DOWN).unwrap();
-    // game.move_piece(DOWN).unwrap();
-    // for line in game.playfield.iter() {
-    //     println!("{:?}", line);
-    // }
+    game.add_piece_to_field(Piece::new(PieceType::I));
+    game.move_moving_piece(DOWN).unwrap();
+    game.move_moving_piece(DOWN).unwrap();
+    game.move_moving_piece(DOWN).unwrap();
+    game.move_moving_piece(DOWN).unwrap();
+    game.move_moving_piece(DOWN).unwrap();
+    game.move_moving_piece(DOWN).unwrap();
+    game.move_moving_piece(DOWN).unwrap();
+    game.move_moving_piece(DOWN).unwrap();
+    game.move_moving_piece(DOWN).unwrap();
+    game.move_moving_piece(LEFT).unwrap();
+
     let stdout = io::stdout().into_raw_mode().unwrap();
     let backend = TermionBackend::new(stdout);
     let mut terminal = Terminal::new(backend).unwrap();
+    draw_game(&mut terminal, &game).unwrap();
 
     for event in io::stdin().keys() {
         match event {
             Ok(Key::Char('q')) => break,
             Ok(Key::Char('j')) => {
-                game.move_moving_piece(DOWN).unwrap();
+                match game.move_moving_piece(DOWN) {
+                    Ok(_) => (),
+                    Err(_) => (),
+                };
             }
             Ok(Key::Char('k')) => {
-                game.rotate_moving_piece(&COUNTER_CLOCKWISE).unwrap();
+                match game.rotate_moving_piece(&COUNTER_CLOCKWISE) {
+                    Ok(_) => (),
+                    Err(_) => (),
+                };
             }
             Ok(Key::Char('h')) => {
-                game.move_moving_piece(LEFT).unwrap();
+                match game.move_moving_piece(LEFT) {
+                    Ok(_) => (),
+                    Err(_) => (),
+                };
             }
             Ok(Key::Char('l')) => {
-                game.move_moving_piece(RIGHT).unwrap();
+                match game.move_moving_piece(RIGHT) {
+                    Ok(_) => (),
+                    Err(_) => (),
+                };
             }
+            Ok(Key::Char('d')) => {
+                game.place_moving_piece();
+            }
+
             _ => (),
         }
         draw_game(&mut terminal, &game).unwrap();
