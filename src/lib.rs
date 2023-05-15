@@ -3,12 +3,13 @@ use std::{
     error::{self, Error},
     fmt, io,
 };
+
 use termion::raw::RawTerminal;
 use tui::{
     backend::TermionBackend,
     layout::Constraint,
     style::{Color, Modifier, Style},
-    widgets::{Block, Cell, Row, Table},
+    widgets::{Block, Cell, Paragraph, Row, Table},
     Terminal,
 };
 
@@ -306,6 +307,35 @@ impl Game {
         return Ok(());
     }
 
+    // TODO: make private
+    pub fn piece_is_out_of_bounds(&self, piece: &Piece) -> bool {
+        let piece_points = match piece.get_piece_points() {
+            Ok(points) => points,
+            Err(_) => return true,
+        };
+
+        for point in piece_points.iter() {
+            if point.0 < 0 || point.1 < 0 {
+                return true;
+            }
+            if point.0 >= self.playfield.len() as i16 || point.1 >= self.playfield[0].len() as i16 {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    pub fn piece_is_overlapping_with(&self, piece: &Piece, checked: i16) -> bool {
+        let piece_points = piece.get_piece_points().unwrap();
+
+        for point in piece_points.iter() {
+            if self.playfield[point.0 as usize][point.1 as usize] == checked {
+                return true;
+            }
+        }
+        return false;
+    }
+
     fn fill_field_with_dropped_points(&mut self, points: [Point; 4]) {
         for point in points.iter() {
             self.playfield[point.0 as usize][point.1 as usize] = 8;
@@ -314,29 +344,23 @@ impl Game {
 
     fn update_ghost_piece(&mut self) {
         if let Some(ghost_piece) = &self.ghost_piece {
-            match self.clear_piece_points(&ghost_piece.clone()) {
-                Ok(_) => {}
-                Err(_) => {}
-            }
+            self.clear_piece_points(&ghost_piece.clone()).unwrap();
         }
         let mut ghost_piece = self.moving_piece.clone();
         ghost_piece.color = -1;
-        // Move the ghost piece down until it's in a valid position
-        let mut retries = 0;
-        while let Err(MinoesError::OverlappingMinoes(OverlappingMinoesError)) =
-            self.piece_is_in_allowed_position(&ghost_piece)
+
+        let mut lowered_counter = 0;
+        while !self.piece_is_out_of_bounds(&ghost_piece)
+            && !self.piece_is_overlapping_with(&ghost_piece, 8)
         {
-            if retries > 4 {
-                break;
-            }
             ghost_piece.move_piece(&TetrisDirection::Down);
-            retries += 1;
+            lowered_counter += 1;
         }
-        // Move the ghost piece down until it hits something
-        while let Ok(_) = self.piece_is_in_allowed_position(&ghost_piece) {
-            ghost_piece.move_piece(&TetrisDirection::Down);
+
+        // Move the ghost piece up one step, since we lowered it one step too far
+        if lowered_counter != 0 {
+            ghost_piece.move_piece(&TetrisDirection::Up);
         }
-        ghost_piece.move_piece(&TetrisDirection::Up);
         match self.fill_piece_points(&ghost_piece) {
             Ok(_) => {}
             Err(_) => {}
@@ -347,10 +371,11 @@ impl Game {
         self.fill_piece_points(&self.moving_piece.clone()).unwrap();
     }
 
-    pub fn add_piece_to_field(&mut self, piece: Piece) {
+    pub fn add_piece_to_field(&mut self, piece: Piece) -> Result<(), MinoesError> {
         self.moving_piece = piece;
-        self.fill_piece_points(&self.moving_piece.clone()).unwrap();
+        self.fill_piece_points(&self.moving_piece.clone())?;
         self.update_ghost_piece();
+        return Ok(());
     }
 
     pub fn rotate_moving_piece(&mut self, direction: &Rotation) -> Result<(), OutOfBoundsError> {
@@ -393,12 +418,13 @@ impl Game {
         return Ok(());
     }
 
-    pub fn hard_drop_moving_piece(&mut self) {
+    pub fn hard_drop_moving_piece(&mut self) -> Result<(), MinoesError> {
         self.clear_piece_points(&self.moving_piece.clone()).unwrap();
         self.moving_piece = self.ghost_piece.clone().unwrap();
         self.ghost_piece = None;
         self.fill_field_with_dropped_points(self.moving_piece.get_piece_points().unwrap());
-        self.add_piece_to_field(Piece::random_piece())
+        self.add_piece_to_field(Piece::random_piece())?;
+        return Ok(());
     }
 }
 
@@ -452,6 +478,16 @@ pub fn draw_game(
             .column_spacing(0)
             .highlight_style(Style::default().add_modifier(Modifier::BOLD));
         f.render_widget(table, f.size());
+    })?;
+    Ok(())
+}
+
+pub fn draw_game_over(
+    terminal: &mut Terminal<TermionBackend<RawTerminal<io::Stdout>>>,
+) -> Result<(), Box<dyn error::Error>> {
+    terminal.draw(|f| {
+        let block = Paragraph::new("Game Over");
+        f.render_widget(block, f.size());
     })?;
     Ok(())
 }
