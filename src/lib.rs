@@ -2,7 +2,11 @@ use rand::Rng;
 use std::{
     error::{self, Error},
     fmt, io,
+    sync::mpsc::{self, Receiver},
+    thread::{self, sleep},
+    time::{Duration, Instant},
 };
+use termion::{event::Key, input::TermRead};
 
 use termion::raw::RawTerminal;
 use tui::{
@@ -13,6 +17,7 @@ use tui::{
     Terminal,
 };
 
+#[derive(Debug)]
 pub enum TetrisDirection {
     Up,
     Down,
@@ -35,6 +40,7 @@ pub const RIGHT: TetrisDirection = TetrisDirection::Right;
 
 pub const KICKS: [(i16, i16); 5] = [(0, 0), (-1, 0), (-1, 1), (0, -2), (-1, -2)];
 
+#[derive(Debug)]
 pub enum Rotation {
     Clockwise,
     CounterClockwise,
@@ -238,13 +244,91 @@ impl Piece {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
+pub enum Event {
+    TimePassed,
+    MovePiece(TetrisDirection),
+    RotatePiece(Rotation),
+    HardDropPiece,
+    Quit,
+}
+
+#[derive(Debug)]
 pub struct Game {
     pub playfield: [[i16; 10]; 11],
     pub moving_piece: Piece,
     pub ghost_piece: Option<Piece>,
-    // next_piece: Option<Piece>,
-    // hold_piece: Option<Piece>,
+    pub event_receiver: Receiver<Event>,
+}
+
+impl Default for Game {
+    fn default() -> Game {
+        let (event_sender, event_receiver) = mpsc::channel();
+        let key_sender = event_sender.clone();
+
+        thread::spawn(move || {
+            let mut last_action_time = Instant::now();
+            loop {
+                let elapsed = Instant::now().duration_since(last_action_time);
+                let time_elapsed = elapsed >= Duration::from_millis(500);
+
+                if time_elapsed {
+                    event_sender
+                        .send(Event::TimePassed)
+                        .expect("Could not send message");
+                    last_action_time = Instant::now();
+                }
+
+                sleep(Duration::from_millis(10));
+            }
+        });
+
+        thread::spawn(move || {
+            for event in io::stdin().keys() {
+                match event {
+                    Ok(Key::Char('q')) => {
+                        key_sender
+                            .send(Event::Quit)
+                            .expect("Could not send message");
+                    }
+                    Ok(Key::Char('j')) => {
+                        key_sender
+                            .send(Event::MovePiece(TetrisDirection::Down))
+                            .expect("Could not send message");
+                    }
+                    Ok(Key::Char('k')) => {
+                        key_sender
+                            .send(Event::RotatePiece(COUNTER_CLOCKWISE))
+                            .expect("Could not send message");
+                    }
+                    Ok(Key::Char('h')) => {
+                        key_sender
+                            .send(Event::MovePiece(TetrisDirection::Left))
+                            .expect("Could not send message");
+                    }
+                    Ok(Key::Char('l')) => {
+                        key_sender
+                            .send(Event::MovePiece(TetrisDirection::Right))
+                            .expect("Could not send message");
+                    }
+                    Ok(Key::Char('d')) => {
+                        key_sender
+                            .send(Event::HardDropPiece)
+                            .expect("Could not send message");
+                    }
+
+                    _ => (),
+                }
+            }
+        });
+
+        return Self {
+            playfield: [[0; 10]; 11],
+            moving_piece: Piece::random_piece(),
+            ghost_piece: None,
+            event_receiver,
+        };
+    }
 }
 
 impl Game {

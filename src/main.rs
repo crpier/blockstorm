@@ -1,9 +1,8 @@
 use blockbuster::{
-    draw_game, draw_game_over, Game, MinoesError, OverlappingMinoesError, Piece, PieceType,
-    COUNTER_CLOCKWISE, DOWN, LEFT, RIGHT,
+    draw_game, draw_game_over, Event, Game, MinoesError, OverlappingMinoesError, Piece, PieceType,
 };
 use std::io;
-use termion::{event::Key, input::TermRead, raw::IntoRawMode};
+use termion::raw::IntoRawMode;
 use tui::{backend::TermionBackend, Terminal};
 
 fn main() {
@@ -26,42 +25,27 @@ fn main() {
     let mut terminal = Terminal::new(backend).unwrap();
     draw_game(&mut terminal, &game).unwrap();
 
-    for event in io::stdin().keys() {
+    loop {
+        let event = game.event_receiver.recv().unwrap();
         match event {
-            Ok(Key::Char('q')) => break,
-            Ok(Key::Char('j')) => {
+            Event::Quit => break,
+            Event::MovePiece(direction) => {
                 if !game_ended {
-                    match game.move_moving_piece(DOWN) {
+                    match game.move_moving_piece(direction) {
                         Ok(_) => (),
                         Err(_) => (),
                     };
                 }
             }
-            Ok(Key::Char('k')) => {
+            Event::RotatePiece(rotation) => {
                 if !game_ended {
-                    match game.rotate_moving_piece(&COUNTER_CLOCKWISE) {
+                    match game.rotate_moving_piece(&rotation) {
                         Ok(_) => (),
                         Err(_) => (),
                     };
                 }
             }
-            Ok(Key::Char('h')) => {
-                if !game_ended {
-                    match game.move_moving_piece(LEFT) {
-                        Ok(_) => (),
-                        Err(_) => (),
-                    };
-                }
-            }
-            Ok(Key::Char('l')) => {
-                if !game_ended {
-                    match game.move_moving_piece(RIGHT) {
-                        Ok(_) => (),
-                        Err(_) => (),
-                    };
-                }
-            }
-            Ok(Key::Char('d')) => {
+            Event::HardDropPiece => {
                 match game.hard_drop_moving_piece() {
                     Ok(_) => (),
                     Err(MinoesError::OverlappingMinoes(OverlappingMinoesError)) => {
