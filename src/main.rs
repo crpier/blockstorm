@@ -1,5 +1,6 @@
 use blockbuster::{
-    draw_game, draw_game_over, Event, Game, MinoesError, OverlappingMinoesError, Piece, PieceType,
+    draw_game, draw_game_over, Event, Game, MinoesError, OutOfBoundsError, OverlappingMinoesError,
+    Piece, PieceType, DOWN,
 };
 use std::io;
 use termion::raw::IntoRawMode;
@@ -55,8 +56,21 @@ fn main() {
                     Err(_) => panic!("Unexpected error"),
                 };
             }
-
-            _ => (),
+            Event::TimePassed => {
+                if !game_ended {
+                    match game.move_moving_piece(DOWN) {
+                        Ok(_) => (),
+                        Err(OutOfBoundsError) => match game.hard_drop_moving_piece() {
+                            Ok(_) => (),
+                            Err(MinoesError::OverlappingMinoes(OverlappingMinoesError)) => {
+                                draw_game_over(&mut terminal).unwrap();
+                                game_ended = true;
+                            }
+                            Err(_) => panic!("Unexpected error"),
+                        },
+                    };
+                }
+            }
         }
         if !game_ended {
             draw_game(&mut terminal, &game).unwrap();
