@@ -11,9 +11,10 @@ use termion::{event::Key, input::TermRead};
 use termion::raw::RawTerminal;
 use tui::{
     backend::TermionBackend,
-    layout::Constraint,
+    layout::{Alignment, Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
-    widgets::{Block, Cell, Paragraph, Row, Table},
+    text::{Span, Spans},
+    widgets::{Block, Borders, Cell, Paragraph, Row, Table, Wrap},
     Terminal,
 };
 
@@ -260,10 +261,13 @@ pub enum Event {
 
 #[derive(Debug)]
 pub struct Game {
-    pub playfield: [[i16; 10]; 11],
-    pub moving_piece: Piece,
-    pub ghost_piece: Option<Piece>,
     pub event_receiver: Receiver<Event>,
+    pub ghost_piece: Option<Piece>,
+    pub moving_piece: Piece,
+    pub playfield: [[i16; 10]; 22],
+    pub score: u16,
+    pub level: u16,
+    pub lines_cleared: u16,
 }
 
 impl Default for Game {
@@ -328,10 +332,13 @@ impl Default for Game {
         });
 
         return Self {
-            playfield: [[0; 10]; 11],
-            moving_piece: Piece::random_piece(),
-            ghost_piece: None,
             event_receiver,
+            ghost_piece: None,
+            moving_piece: Piece::random_piece(),
+            playfield: [[0; 10]; 22],
+            score: 0,
+            level: 1,
+            lines_cleared: 0,
         };
     }
 }
@@ -515,9 +522,28 @@ impl Game {
         self.moving_piece = self.ghost_piece.unwrap().clone();
         self.ghost_piece = None;
         self.fill_field_with_dropped_points(self.moving_piece.get_piece_points().unwrap());
-        self.clear_filled_lines();
+        let cleared_lines_count = self.clear_filled_lines();
+        self.adjust_level(cleared_lines_count);
+        self.adjust_score(cleared_lines_count);
         self.add_piece_to_field(Piece::random_piece())?;
         return Ok(());
+    }
+
+    fn adjust_level(&mut self, cleared_lines: usize) {
+        self.lines_cleared += cleared_lines as u16;
+        if self.lines_cleared >= self.level * 10 {
+            self.level += 1;
+        }
+    }
+
+    fn adjust_score(&mut self, cleared_lines: usize) {
+        match cleared_lines {
+            1 => self.score += 100 * self.level,
+            2 => self.score += 300 * self.level,
+            3 => self.score += 500 * self.level,
+            4 => self.score += 800 * self.level,
+            _ => {}
+        }
     }
 
     #[allow(unused_assignments)]
@@ -543,6 +569,33 @@ pub fn draw_game(
     game: &Game,
 ) -> Result<(), Box<dyn error::Error>> {
     terminal.draw(|f| {
+        let vertical_chunk = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(
+                [
+                    Constraint::Length((game.playfield.len() + 2).try_into().unwrap()),
+                    Constraint::Min(0),
+                ]
+                .as_ref(),
+            )
+            .split(f.size());
+        let chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints(
+                [
+                    Constraint::Length(20),
+                    Constraint::Length((game.playfield[0].len() * 2 + 2).try_into().unwrap()),
+                    Constraint::Length(20),
+                    Constraint::Min(0),
+                ]
+                .as_ref(),
+            )
+            .split(vertical_chunk[0]);
+        let help_piece_block = Block::default()
+            .title("Next piece")
+            .title_alignment(tui::layout::Alignment::Center);
+        f.render_widget(help_piece_block, chunks[0]);
+
         let field = game.playfield.map(|row| {
             Row::new(row.map(|el| {
                 let color = match el {
@@ -569,7 +622,6 @@ pub fn draw_game(
             // You can set the style of the entire Table.
             .style(Style::default().fg(Color::White))
             // As any other widget, a Table can be wrapped in a Block.
-            .block(Block::default().title("Tetris"))
             // Columns widths are constrained in the same way as Layout...
             .widths(&[
                 Constraint::Length(2),
@@ -584,10 +636,41 @@ pub fn draw_game(
                 Constraint::Length(2),
                 Constraint::Length(2),
             ])
-            // ...and they can be separated by a fixed spacing.
             .column_spacing(0)
-            .highlight_style(Style::default().add_modifier(Modifier::BOLD));
-        f.render_widget(table, f.size());
+            .highlight_style(Style::default().add_modifier(Modifier::BOLD))
+            .block(Block::default().borders(Borders::ALL));
+        f.render_widget(table, chunks[1]);
+        let text = vec![
+            Spans::from(vec![Span::raw("")]),
+            Spans::from(vec![Span::raw("")]),
+            Spans::from(vec![Span::raw("")]),
+            Spans::from(vec![Span::raw("Score")]),
+            Spans::from(Span::styled(
+                game.score.to_string(),
+                Style::default().fg(Color::Red),
+            )),
+            Spans::from(vec![Span::raw("")]),
+            Spans::from(vec![Span::raw("Level")]),
+            Spans::from(Span::styled(
+                game.level.to_string(),
+                Style::default().fg(Color::Red),
+            )),
+        ];
+        let score_section = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(10), Constraint::Min(0)].as_ref())
+            .split(chunks[2]);
+        let score_paragraph = Paragraph::new(text)
+            .block(
+                Block::default()
+                    .title("Score")
+                    .title_alignment(Alignment::Center)
+                    .borders(Borders::ALL),
+            )
+            .style(Style::default().fg(Color::White).bg(Color::Black))
+            .alignment(Alignment::Center)
+            .wrap(Wrap { trim: true });
+        f.render_widget(score_paragraph, score_section[0]);
     })?;
     Ok(())
 }

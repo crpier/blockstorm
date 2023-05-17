@@ -2,6 +2,11 @@ use blockbuster::{
     draw_game, draw_game_over, Event, Game, MinoesError, OutOfBoundsError, OverlappingMinoesError,
     Piece, PieceType, DOWN,
 };
+use crossterm::{
+    event::DisableMouseCapture,
+    execute,
+    terminal::{disable_raw_mode, LeaveAlternateScreen},
+};
 use std::io;
 use termion::raw::IntoRawMode;
 use tui::{backend::TermionBackend, Terminal};
@@ -24,6 +29,7 @@ fn main() {
     let stdout = io::stdout().into_raw_mode().unwrap();
     let backend = TermionBackend::new(stdout);
     let mut terminal = Terminal::new(backend).unwrap();
+    terminal.clear().unwrap();
     draw_game(&mut terminal, &game).unwrap();
 
     loop {
@@ -76,4 +82,12 @@ fn main() {
             draw_game(&mut terminal, &game).unwrap();
         }
     }
+    disable_raw_mode().unwrap();
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )
+    .unwrap();
+    terminal.show_cursor().unwrap();
 }
