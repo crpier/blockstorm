@@ -77,6 +77,11 @@ impl fmt::Display for OverlappingMinoesError {
         write!(f, "Out of bounds")
     }
 }
+impl From<OutOfBoundsError> for MinoesError {
+    fn from(_: OutOfBoundsError) -> Self {
+        MinoesError::OutOfBounds(OutOfBoundsError)
+    }
+}
 #[derive(Debug)]
 pub enum MinoesError {
     OutOfBounds(OutOfBoundsError),
@@ -270,7 +275,7 @@ impl Default for Game {
             let mut last_action_time = Instant::now();
             loop {
                 let elapsed = Instant::now().duration_since(last_action_time);
-                let time_elapsed = elapsed >= Duration::from_millis(500);
+                let time_elapsed = elapsed >= Duration::from_millis(1000);
 
                 if time_elapsed {
                     event_sender
@@ -502,13 +507,34 @@ impl Game {
         return Ok(());
     }
 
+    // There is no need for a separate lock function, since a lock is really a hard drop from
+    // lowest possible height
     pub fn hard_drop_moving_piece(&mut self) -> Result<(), MinoesError> {
-        self.clear_piece_points(&self.moving_piece.clone()).unwrap();
-        self.moving_piece = self.ghost_piece.clone().unwrap();
+        self.clear_piece_points(&self.moving_piece.clone())?;
+        self.clear_piece_points(&self.ghost_piece.unwrap().clone())?;
+        self.moving_piece = self.ghost_piece.unwrap().clone();
         self.ghost_piece = None;
         self.fill_field_with_dropped_points(self.moving_piece.get_piece_points().unwrap());
+        self.clear_filled_lines();
         self.add_piece_to_field(Piece::random_piece())?;
         return Ok(());
+    }
+
+    #[allow(unused_assignments)]
+    pub fn clear_filled_lines(&mut self) -> usize {
+        let mut cleared_lines: usize = 0;
+        for mut last_line in (0..self.playfield.len()).rev() {
+            if self.playfield[last_line].iter().all(|x| *x == 8) {
+                cleared_lines += 1;
+                for i in (1..=last_line).rev() {
+                    self.playfield[i] = self.playfield[i - 1];
+                }
+                // because we just moved the last line up one step, we need to check it again
+                // before going to the line above
+                last_line -= 1;
+            }
+        }
+        return cleared_lines;
     }
 }
 
