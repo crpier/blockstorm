@@ -1,6 +1,6 @@
 use blockbuster::{
     draw_game, draw_game_over, Event, Game, MinoesError, OutOfBoundsError, OverlappingMinoesError,
-    Piece, PieceType, DOWN,
+    DOWN,
 };
 use crossterm::{
     event::DisableMouseCapture,
@@ -14,23 +14,11 @@ use tui::{backend::TermionBackend, Terminal};
 fn main() {
     let mut game = Game::default();
     let mut game_ended = false;
-    game.add_piece_to_field(Piece::new(PieceType::T)).unwrap();
-    // game.move_moving_piece(DOWN).unwrap();
-    // game.move_moving_piece(DOWN).unwrap();
-    // game.move_moving_piece(DOWN).unwrap();
-    // game.move_moving_piece(DOWN).unwrap();
-    // game.move_moving_piece(DOWN).unwrap();
-    // game.move_moving_piece(DOWN).unwrap();
-    // game.move_moving_piece(DOWN).unwrap();
-    // game.move_moving_piece(DOWN).unwrap();
-    // game.move_moving_piece(DOWN).unwrap();
-    // game.hard_drop_moving_piece();
 
     let stdout = io::stdout().into_raw_mode().unwrap();
     let backend = TermionBackend::new(stdout);
     let mut terminal = Terminal::new(backend).unwrap();
     terminal.clear().unwrap();
-    draw_game(&mut terminal, &game).unwrap();
 
     loop {
         let event = game.event_receiver.recv().unwrap();

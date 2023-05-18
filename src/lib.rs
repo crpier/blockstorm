@@ -1,4 +1,4 @@
-use rand::Rng;
+use rand::seq::SliceRandom;
 use std::{
     error::{self, Error},
     fmt, io,
@@ -180,19 +180,6 @@ impl Piece {
             color,
         }
     }
-    pub fn random_piece() -> Self {
-        let mut rng = rand::thread_rng();
-        match rng.gen_range(0..7) {
-            0 => Piece::new(PieceType::I),
-            1 => Piece::new(PieceType::J),
-            2 => Piece::new(PieceType::L),
-            3 => Piece::new(PieceType::O),
-            4 => Piece::new(PieceType::S),
-            5 => Piece::new(PieceType::T),
-            6 => Piece::new(PieceType::Z),
-            _ => panic!("Random number generator returned invalid number"),
-        }
-    }
 
     pub fn get_piece_points(&self) -> Result<[Point; 4], OutOfBoundsError> {
         let mut points = [Point(0, 0); 4];
@@ -268,12 +255,16 @@ pub struct Game {
     pub score: u16,
     pub level: u16,
     pub lines_cleared: u16,
+    pub next_pieces: Vec<Piece>,
 }
 
 impl Default for Game {
     fn default() -> Game {
         let (event_sender, event_receiver) = mpsc::channel();
         let key_sender = event_sender.clone();
+        event_sender
+            .send(Event::TimePassed)
+            .expect("Could not send message");
 
         thread::spawn(move || {
             let mut last_action_time = Instant::now();
@@ -331,19 +322,54 @@ impl Default for Game {
             }
         });
 
+        let mut rng = rand::thread_rng();
+        let mut next_pieces = vec![
+            Piece::new(PieceType::I),
+            Piece::new(PieceType::J),
+            Piece::new(PieceType::L),
+            Piece::new(PieceType::O),
+            Piece::new(PieceType::S),
+            Piece::new(PieceType::T),
+            Piece::new(PieceType::Z),
+        ];
+        next_pieces.shuffle(&mut rng);
+
         return Self {
             event_receiver,
             ghost_piece: None,
-            moving_piece: Piece::random_piece(),
+            moving_piece: next_pieces.pop().unwrap(),
             playfield: [[0; 10]; 22],
             score: 0,
             level: 1,
             lines_cleared: 0,
+            next_pieces,
         };
     }
 }
 
 impl Game {
+    pub fn get_next_piece_in_queue(&mut self) -> Piece {
+        match self.next_pieces.pop() {
+            Some(piece) => piece,
+            None => {
+                let mut rng = rand::thread_rng();
+                let mut next_pieces = vec![
+                    Piece::new(PieceType::I),
+                    Piece::new(PieceType::J),
+                    Piece::new(PieceType::L),
+                    Piece::new(PieceType::O),
+                    Piece::new(PieceType::S),
+                    Piece::new(PieceType::T),
+                    Piece::new(PieceType::Z),
+                ];
+
+                next_pieces.shuffle(&mut rng);
+                self.next_pieces = next_pieces;
+                self.next_pieces.pop().unwrap()
+            }
+        }
+    }
+
     fn fill_piece_points(&mut self, piece: &Piece) -> Result<(), MinoesError> {
         let piece_points = piece.get_piece_points().unwrap();
         for point in piece_points.iter() {
@@ -525,7 +551,8 @@ impl Game {
         let cleared_lines_count = self.clear_filled_lines();
         self.adjust_level(cleared_lines_count);
         self.adjust_score(cleared_lines_count);
-        self.add_piece_to_field(Piece::random_piece())?;
+        let next_piece = self.get_next_piece_in_queue();
+        self.add_piece_to_field(next_piece)?;
         return Ok(());
     }
 
