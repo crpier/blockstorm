@@ -50,6 +50,12 @@ fn main() {
                     Err(_) => panic!("Unexpected error"),
                 };
             }
+            Event::HoldPiece => {
+                match game.hold_moving_piece() {
+                    Ok(_) => (),
+                    Err(_) => (),
+                };
+            }
             Event::TimePassed => {
                 if !game_ended {
                     match game.move_moving_piece(DOWN) {
@@ -67,7 +73,7 @@ fn main() {
             }
         }
         if !game_ended {
-            draw_game(&mut terminal, &game).unwrap();
+            draw_game(&mut terminal, &mut game).unwrap();
         }
     }
     disable_raw_mode().unwrap();

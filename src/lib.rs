@@ -243,6 +243,7 @@ pub enum Event {
     MovePiece(TetrisDirection),
     RotatePiece(Rotation),
     HardDropPiece,
+    HoldPiece,
     Quit,
 }
 
@@ -256,6 +257,7 @@ pub struct Game {
     pub level: u16,
     pub lines_cleared: u16,
     pub next_pieces: Vec<Piece>,
+    pub held_piece: Option<Piece>,
 }
 
 impl Default for Game {
@@ -316,6 +318,11 @@ impl Default for Game {
                             .send(Event::HardDropPiece)
                             .expect("Could not send message");
                     }
+                    Ok(Key::Char('c')) => {
+                        key_sender
+                            .send(Event::HoldPiece)
+                            .expect("Could not send message");
+                    }
 
                     _ => (),
                 }
@@ -343,30 +350,34 @@ impl Default for Game {
             level: 1,
             lines_cleared: 0,
             next_pieces,
+            held_piece: None,
         };
     }
 }
 
 impl Game {
-    pub fn get_next_piece_in_queue(&mut self) -> Piece {
-        match self.next_pieces.pop() {
-            Some(piece) => piece,
-            None => {
-                let mut rng = rand::thread_rng();
-                let mut next_pieces = vec![
-                    Piece::new(PieceType::I),
-                    Piece::new(PieceType::J),
-                    Piece::new(PieceType::L),
-                    Piece::new(PieceType::O),
-                    Piece::new(PieceType::S),
-                    Piece::new(PieceType::T),
-                    Piece::new(PieceType::Z),
-                ];
+    pub fn get_next_piece_in_queue(&mut self, pop: bool) -> Piece {
+        let mut next_bag = Vec::new();
+        if self.next_pieces.last().is_none() {
+            let mut rng = rand::thread_rng();
+            next_bag = vec![
+                Piece::new(PieceType::I),
+                Piece::new(PieceType::J),
+                Piece::new(PieceType::L),
+                Piece::new(PieceType::O),
+                Piece::new(PieceType::S),
+                Piece::new(PieceType::T),
+                Piece::new(PieceType::Z),
+            ];
 
-                next_pieces.shuffle(&mut rng);
-                self.next_pieces = next_pieces;
-                self.next_pieces.pop().unwrap()
-            }
+            next_bag.shuffle(&mut rng);
+        }
+        self.next_pieces.append(&mut next_bag);
+
+        if pop {
+            self.next_pieces.pop().unwrap()
+        } else {
+            self.next_pieces.last().unwrap().clone()
         }
     }
 
@@ -551,8 +562,27 @@ impl Game {
         let cleared_lines_count = self.clear_filled_lines();
         self.adjust_level(cleared_lines_count);
         self.adjust_score(cleared_lines_count);
-        let next_piece = self.get_next_piece_in_queue();
+        let next_piece = self.get_next_piece_in_queue(true);
         self.add_piece_to_field(next_piece)?;
+        return Ok(());
+    }
+
+    pub fn hold_moving_piece(&mut self) -> Result<(), MinoesError> {
+        self.clear_piece_points(&self.moving_piece.clone())?;
+        self.clear_piece_points(&self.ghost_piece.unwrap().clone())?;
+        match self.held_piece {
+            Some(piece) => {
+                let old_held_piece = piece;
+                self.held_piece = Some(self.moving_piece.clone());
+                self.moving_piece = old_held_piece;
+            }
+            None => {
+                self.held_piece = Some(self.moving_piece.clone());
+                self.moving_piece = self.get_next_piece_in_queue(true);
+            }
+        }
+        self.fill_piece_points(&self.moving_piece.clone()).unwrap();
+        self.add_piece_to_field(self.moving_piece)?;
         return Ok(());
     }
 
@@ -593,7 +623,7 @@ impl Game {
 
 pub fn draw_game(
     terminal: &mut Terminal<TermionBackend<RawTerminal<io::Stdout>>>,
-    game: &Game,
+    game: &mut Game,
 ) -> Result<(), Box<dyn error::Error>> {
     terminal.draw(|f| {
         let vertical_chunk = Layout::default()
@@ -612,18 +642,145 @@ pub fn draw_game(
                 [
                     Constraint::Length(20),
                     Constraint::Length((game.playfield[0].len() * 2 + 2).try_into().unwrap()),
-                    Constraint::Length(20),
+                    Constraint::Length(21),
                     Constraint::Min(0),
                 ]
                 .as_ref(),
             )
             .split(vertical_chunk[0]);
-        let help_piece_block = Block::default()
-            .title("Next piece")
-            .title_alignment(tui::layout::Alignment::Center);
-        f.render_widget(help_piece_block, chunks[0]);
+        let piece_info_section = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(
+                [
+                    Constraint::Percentage(45),
+                    Constraint::Percentage(10),
+                    Constraint::Percentage(45),
+                ]
+                .as_ref(),
+            )
+            .split(chunks[0]);
 
-        let field = game.playfield.map(|row| {
+        let mut held_piece_field = game.playfield.clone().map(|row| row.map(|_cell| 0));
+        match game.held_piece {
+            Some(piece) => {
+                let points = piece.get_piece_points().unwrap();
+                for point in points {
+                    held_piece_field[(point.0 - piece.center.0 + 3) as usize]
+                        [(point.1 - piece.center.1 + 4) as usize] = piece.color;
+                }
+            }
+            None => {}
+        };
+        let held_piece_rows = held_piece_field.map(|row| {
+            Row::new(row.map(|el| {
+                let color = match el {
+                    // Pieces
+                    n if n.rem_euclid(10) == 1 => Color::Cyan,
+                    n if n.rem_euclid(10) == 2 => Color::Blue,
+                    n if n.rem_euclid(10) == 3 => Color::Red,
+                    n if n.rem_euclid(10) == 4 => Color::Yellow,
+                    n if n.rem_euclid(10) == 5 => Color::Green,
+                    n if n.rem_euclid(10) == 6 => Color::Magenta,
+                    n if n.rem_euclid(10) == 7 => Color::LightRed,
+                    // Pieces already placed
+                    n if n.rem_euclid(10) == 8 => Color::DarkGray,
+                    // Ghost piece
+                    // Empty tile
+                    n if n.rem_euclid(10) == 0 => Color::Black,
+                    _ => Color::White,
+                };
+                Cell::from("").style(Style::default().bg(color))
+            }))
+        });
+        let held_piece_table = Table::new(held_piece_rows)
+            // You can set the style of the entire Table.
+            .style(Style::default().fg(Color::White))
+            // As any other widget, a Table can be wrapped in a Block.
+            // Columns widths are constrained in the same way as Layout...
+            .widths(&[
+                Constraint::Length(2),
+                Constraint::Length(2),
+                Constraint::Length(2),
+                Constraint::Length(2),
+                Constraint::Length(2),
+                Constraint::Length(2),
+                Constraint::Length(2),
+                Constraint::Length(2),
+                Constraint::Length(2),
+                Constraint::Length(2),
+                Constraint::Length(2),
+                Constraint::Length(2),
+                Constraint::Length(2),
+            ])
+            .column_spacing(0)
+            .highlight_style(Style::default().add_modifier(Modifier::BOLD))
+            .block(
+                Block::default()
+                    .title("Hold")
+                    .title_alignment(tui::layout::Alignment::Center)
+                    .borders(Borders::ALL),
+            );
+        f.render_widget(held_piece_table, piece_info_section[0]);
+
+        let mut next_piece_field = game.playfield.clone().map(|row| row.map(|_cell| 0));
+        let piece = game.get_next_piece_in_queue(false);
+        let points = piece.get_piece_points().unwrap();
+        for point in points {
+            next_piece_field[(point.0 - piece.center.0 + 3) as usize]
+                [(point.1 - piece.center.1 + 4) as usize] = piece.color;
+        }
+        let next_piece_rows = next_piece_field.map(|row| {
+            Row::new(row.map(|el| {
+                let color = match el {
+                    // Pieces
+                    n if n.rem_euclid(10) == 1 => Color::Cyan,
+                    n if n.rem_euclid(10) == 2 => Color::Blue,
+                    n if n.rem_euclid(10) == 3 => Color::Red,
+                    n if n.rem_euclid(10) == 4 => Color::Yellow,
+                    n if n.rem_euclid(10) == 5 => Color::Green,
+                    n if n.rem_euclid(10) == 6 => Color::Magenta,
+                    n if n.rem_euclid(10) == 7 => Color::LightRed,
+                    // Pieces already placed
+                    n if n.rem_euclid(10) == 8 => Color::DarkGray,
+                    // Ghost piece
+                    // Empty tile
+                    n if n.rem_euclid(10) == 0 => Color::Black,
+                    _ => Color::White,
+                };
+                Cell::from("").style(Style::default().bg(color))
+            }))
+        });
+        let next_piece_table = Table::new(next_piece_rows)
+            // You can set the style of the entire Table.
+            .style(Style::default().fg(Color::White))
+            // As any other widget, a Table can be wrapped in a Block.
+            // Columns widths are constrained in the same way as Layout...
+            .widths(&[
+                Constraint::Length(2),
+                Constraint::Length(2),
+                Constraint::Length(2),
+                Constraint::Length(2),
+                Constraint::Length(2),
+                Constraint::Length(2),
+                Constraint::Length(2),
+                Constraint::Length(2),
+                Constraint::Length(2),
+                Constraint::Length(2),
+                Constraint::Length(2),
+                Constraint::Length(2),
+                Constraint::Length(2),
+            ])
+            .column_spacing(0)
+            .highlight_style(Style::default().add_modifier(Modifier::BOLD))
+            .block(
+                Block::default()
+                    .title("Next piece")
+                    .title_alignment(tui::layout::Alignment::Center)
+                    .borders(Borders::ALL),
+            );
+        f.render_widget(next_piece_table, piece_info_section[2]);
+
+        let field_rows = game.playfield.map(|row| {
             Row::new(row.map(|el| {
                 let color = match el {
                     // Pieces
@@ -645,7 +802,7 @@ pub fn draw_game(
                 Cell::from("").style(Style::default().bg(color))
             }))
         });
-        let table = Table::new(field)
+        let playfield_table = Table::new(field_rows)
             // You can set the style of the entire Table.
             .style(Style::default().fg(Color::White))
             // As any other widget, a Table can be wrapped in a Block.
@@ -666,9 +823,8 @@ pub fn draw_game(
             .column_spacing(0)
             .highlight_style(Style::default().add_modifier(Modifier::BOLD))
             .block(Block::default().borders(Borders::ALL));
-        f.render_widget(table, chunks[1]);
+        f.render_widget(playfield_table, chunks[1]);
         let text = vec![
-            Spans::from(vec![Span::raw("")]),
             Spans::from(vec![Span::raw("")]),
             Spans::from(vec![Span::raw("")]),
             Spans::from(vec![Span::raw("Score")]),
