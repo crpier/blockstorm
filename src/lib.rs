@@ -2,7 +2,7 @@ use rand::seq::SliceRandom;
 use std::{
     error::{self, Error},
     fmt, io,
-    sync::mpsc::{self, Receiver},
+    sync::mpsc::{self, Receiver, Sender},
     thread::{self, sleep},
     time::{Duration, Instant},
 };
@@ -252,18 +252,20 @@ pub enum Event {
 pub struct Game {
     pub event_receiver: Receiver<Event>,
     pub ghost_piece: Option<Piece>,
-    pub moving_piece: Piece,
-    pub playfield: [[i16; 10]; 22],
-    pub score: u16,
+    pub held_piece: Option<Piece>,
     pub level: u16,
     pub lines_cleared: u16,
+    pub moving_piece: Piece,
     pub next_pieces: Vec<Piece>,
-    pub held_piece: Option<Piece>,
+    pub playfield: [[i16; 10]; 22],
+    pub score: u16,
+    pub speed_info_sender: Sender<u64>,
 }
 
 impl Default for Game {
     fn default() -> Game {
         let (event_sender, event_receiver) = mpsc::channel();
+        let (speed_info_sender, speed_info_receiver) = mpsc::channel::<u64>();
         let key_sender = event_sender.clone();
         event_sender
             .send(Event::TimePassed)
@@ -271,9 +273,13 @@ impl Default for Game {
 
         thread::spawn(move || {
             let mut last_action_time = Instant::now();
+            let mut time_per_row = 1000;
             loop {
+                if let Ok(speed) = speed_info_receiver.try_recv() {
+                    time_per_row = speed;
+                }
                 let elapsed = Instant::now().duration_since(last_action_time);
-                let time_elapsed = elapsed >= Duration::from_millis(1000);
+                let time_elapsed = elapsed >= Duration::from_millis(time_per_row);
 
                 if time_elapsed {
                     event_sender
@@ -345,13 +351,14 @@ impl Default for Game {
         return Self {
             event_receiver,
             ghost_piece: None,
-            moving_piece: next_pieces.pop().unwrap(),
-            playfield: [[0; 10]; 22],
-            score: 0,
+            held_piece: None,
             level: 1,
             lines_cleared: 0,
+            moving_piece: next_pieces.pop().unwrap(),
             next_pieces,
-            held_piece: None,
+            playfield: [[0; 10]; 22],
+            score: 0,
+            speed_info_sender,
         };
     }
 }
@@ -588,9 +595,20 @@ impl Game {
     }
 
     fn adjust_level(&mut self, cleared_lines: usize) {
-        self.lines_cleared += cleared_lines as u16;
-        if self.lines_cleared >= self.level * 10 {
+        match cleared_lines {
+            1 => self.lines_cleared += 1,
+            2 => self.lines_cleared += 3,
+            3 => self.lines_cleared += 5,
+            4 => self.lines_cleared += 8,
+            _ => {}
+        }
+        if self.lines_cleared >= self.level * 5 {
             self.level += 1;
+            self.lines_cleared = 0;
+            let new_speed: u64 = ((0.8 - ((self.level - 1) as f64 * 0.007)).powi(self.level as i32)
+                * 1000.0)
+                .round() as u64;
+            self.speed_info_sender.send(new_speed).unwrap();
         }
     }
 
