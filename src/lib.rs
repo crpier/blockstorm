@@ -84,6 +84,8 @@ impl From<OutOfBoundsError> for MinoesError {
         MinoesError::OutOfBounds(OutOfBoundsError)
     }
 }
+// TODO: actually, make this a normal enum and let errors be its variants (so no more implementing
+// the error trait and what not)
 #[derive(Debug)]
 pub enum MinoesError {
     OutOfBounds(OutOfBoundsError),
@@ -545,6 +547,7 @@ impl Game {
     pub fn move_moving_piece(
         &mut self,
         direction: TetrisDirection,
+        // TODO: this should return either OutOfBoundsError or OverlappingMinoesError
     ) -> Result<(), OutOfBoundsError> {
         self.clear_piece_points(&self.moving_piece.clone()).unwrap();
         self.moving_piece.move_piece(&direction);
@@ -698,7 +701,7 @@ pub fn draw_game(
                     n if n.rem_euclid(10) == 8 => Color::DarkGray,
                     // Ghost piece
                     // Empty tile
-                    n if n.rem_euclid(10) == 0 => Color::Black,
+                    n if n.rem_euclid(10) == 0 => Color::Reset,
                     _ => Color::White,
                 };
                 Cell::from("").style(Style::default().bg(color))
@@ -760,7 +763,7 @@ pub fn draw_game(
                     n if n.rem_euclid(10) == 8 => Color::DarkGray,
                     // Ghost piece
                     // Empty tile
-                    n if n.rem_euclid(10) == 0 => Color::Black,
+                    n if n.rem_euclid(10) == 0 => Color::Reset,
                     _ => Color::White,
                 };
                 Cell::from("").style(Style::default().bg(color))
@@ -812,7 +815,7 @@ pub fn draw_game(
                     // Ghost piece
                     n if n < 0 => Color::White,
                     // Empty tile
-                    n if n.rem_euclid(10) == 0 => Color::Black,
+                    n if n.rem_euclid(10) == 0 => Color::Reset,
                     _ => Color::White,
                 };
                 Cell::from("").style(Style::default().bg(color))
@@ -860,15 +863,16 @@ pub fn draw_game(
             .constraints([Constraint::Length(10), Constraint::Min(0)].as_ref())
             .split(chunks[2]);
         let score_paragraph = Paragraph::new(text)
+            .style(Style::default().fg(Color::White))
+            .alignment(Alignment::Center)
+            .wrap(Wrap { trim: true })
             .block(
                 Block::default()
                     .title("Score")
                     .title_alignment(Alignment::Center)
                     .borders(Borders::ALL),
-            )
-            .style(Style::default().fg(Color::White).bg(Color::Black))
-            .alignment(Alignment::Center)
-            .wrap(Wrap { trim: true });
+            );
+
         f.render_widget(score_paragraph, score_section[0]);
     })?;
     Ok(())
@@ -876,10 +880,51 @@ pub fn draw_game(
 
 pub fn draw_game_over(
     terminal: &mut Terminal<TermionBackend<RawTerminal<io::Stdout>>>,
+    game: &mut Game,
 ) -> Result<(), Box<dyn error::Error>> {
     terminal.draw(|f| {
-        let block = Paragraph::new("Game Over");
-        f.render_widget(block, f.size());
+        let game_over_layout_v = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(
+                [
+                    Constraint::Length(((game.playfield.len() + 2) / 3).try_into().unwrap()),
+                    Constraint::Length(((game.playfield.len() + 2) / 3).try_into().unwrap()),
+                    Constraint::Min(0),
+                ]
+                .as_ref(),
+            )
+            .split(f.size());
+        let game_over_layout = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints(
+                [
+                    Constraint::Length(20),
+                    Constraint::Length((game.playfield[0].len() * 2 + 2).try_into().unwrap()),
+                    Constraint::Min(0),
+                ]
+                .as_ref(),
+            )
+            .split(game_over_layout_v[1]);
+        let game_over_paragraph = Paragraph::new(vec![
+            Spans::from(""),
+            Spans::from(""),
+            Spans::from("Score"),
+            Spans::from(Span::styled(
+                game.score.to_string(),
+                Style::default().fg(Color::Red),
+            )),
+        ])
+        .style(Style::default().fg(Color::White))
+        .alignment(Alignment::Center)
+        .wrap(Wrap { trim: true })
+        .block(
+            Block::default()
+                .title("Game over")
+                .title_alignment(Alignment::Center)
+                .borders(Borders::ALL),
+        );
+
+        f.render_widget(game_over_paragraph, game_over_layout[1]);
     })?;
     Ok(())
 }
