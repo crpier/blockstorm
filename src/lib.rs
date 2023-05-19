@@ -55,6 +55,7 @@ impl Rotation {
     }
 }
 pub const COUNTER_CLOCKWISE: Rotation = Rotation::CounterClockwise;
+pub const CLOCKWISE: Rotation = Rotation::Clockwise;
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Point(pub i16, pub i16);
@@ -128,16 +129,16 @@ impl Piece {
                 center = Point(1, 5);
                 pos_0 = [RelPoint(0, -1), RelPoint(0, 1), RelPoint(-1, 1)];
                 pos_1 = [RelPoint(-1, -1), RelPoint(-1, 0), RelPoint(1, 0)];
-                pos_2 = [RelPoint(0, -1), RelPoint(0, 1), RelPoint(-1, 1)];
-                pos_3 = [RelPoint(-1, -1), RelPoint(-1, 0), RelPoint(1, 0)];
+                pos_2 = [RelPoint(1, -1), RelPoint(0, -1), RelPoint(0, 1)];
+                pos_3 = [RelPoint(-1, 0), RelPoint(1, 0), RelPoint(1, 1)];
                 color = 2;
             }
             PieceType::L => {
                 center = Point(1, 4);
                 pos_0 = [RelPoint(-1, -1), RelPoint(0, -1), RelPoint(0, 1)];
                 pos_1 = [RelPoint(-1, 0), RelPoint(1, 0), RelPoint(1, -1)];
-                pos_2 = [RelPoint(-1, -1), RelPoint(0, -1), RelPoint(0, 1)];
-                pos_3 = [RelPoint(-1, 0), RelPoint(1, 0), RelPoint(1, -1)];
+                pos_2 = [RelPoint(0, -1), RelPoint(0, 1), RelPoint(1, 1)];
+                pos_3 = [RelPoint(-1, 1), RelPoint(-1, 0), RelPoint(1, 0)];
                 color = 3;
             }
             PieceType::O => {
@@ -300,7 +301,7 @@ impl Default for Game {
                     }
                     Ok(Key::Char('k')) => {
                         key_sender
-                            .send(Event::RotatePiece(COUNTER_CLOCKWISE))
+                            .send(Event::RotatePiece(CLOCKWISE))
                             .expect("Could not send message");
                     }
                     Ok(Key::Char('h')) => {
@@ -606,15 +607,12 @@ impl Game {
     #[allow(unused_assignments)]
     pub fn clear_filled_lines(&mut self) -> usize {
         let mut cleared_lines: usize = 0;
-        for mut last_line in (0..self.playfield.len()).rev() {
-            if self.playfield[last_line].iter().all(|x| *x == 8) {
+        for last_line in (0..self.playfield.len()).rev() {
+            while self.playfield[last_line].iter().all(|x| *x == 8) {
                 cleared_lines += 1;
                 for i in (1..=last_line).rev() {
                     self.playfield[i] = self.playfield[i - 1];
                 }
-                // because we just moved the last line up one step, we need to check it again
-                // before going to the line above
-                last_line -= 1;
             }
         }
         return cleared_lines;
@@ -659,6 +657,64 @@ pub fn draw_game(
                 .as_ref(),
             )
             .split(chunks[0]);
+
+        let mut next_piece_field = game.playfield.clone().map(|row| row.map(|_cell| 0));
+        let piece = game.get_next_piece_in_queue(false);
+        let points = piece.get_piece_points().unwrap();
+        for point in points {
+            next_piece_field[(point.0 - piece.center.0 + 3) as usize]
+                [(point.1 - piece.center.1 + 4) as usize] = piece.color;
+        }
+        let next_piece_rows = next_piece_field.map(|row| {
+            Row::new(row.map(|el| {
+                let color = match el {
+                    // Pieces
+                    n if n.rem_euclid(10) == 1 => Color::Cyan,
+                    n if n.rem_euclid(10) == 2 => Color::Blue,
+                    n if n.rem_euclid(10) == 3 => Color::Red,
+                    n if n.rem_euclid(10) == 4 => Color::Yellow,
+                    n if n.rem_euclid(10) == 5 => Color::Green,
+                    n if n.rem_euclid(10) == 6 => Color::Magenta,
+                    n if n.rem_euclid(10) == 7 => Color::LightRed,
+                    // Pieces already placed
+                    n if n.rem_euclid(10) == 8 => Color::DarkGray,
+                    // Ghost piece
+                    // Empty tile
+                    n if n.rem_euclid(10) == 0 => Color::Black,
+                    _ => Color::White,
+                };
+                Cell::from("").style(Style::default().bg(color))
+            }))
+        });
+        let next_piece_table = Table::new(next_piece_rows)
+            // You can set the style of the entire Table.
+            .style(Style::default().fg(Color::White))
+            // As any other widget, a Table can be wrapped in a Block.
+            // Columns widths are constrained in the same way as Layout...
+            .widths(&[
+                Constraint::Length(2),
+                Constraint::Length(2),
+                Constraint::Length(2),
+                Constraint::Length(2),
+                Constraint::Length(2),
+                Constraint::Length(2),
+                Constraint::Length(2),
+                Constraint::Length(2),
+                Constraint::Length(2),
+                Constraint::Length(2),
+                Constraint::Length(2),
+                Constraint::Length(2),
+                Constraint::Length(2),
+            ])
+            .column_spacing(0)
+            .highlight_style(Style::default().add_modifier(Modifier::BOLD))
+            .block(
+                Block::default()
+                    .title("Next piece")
+                    .title_alignment(tui::layout::Alignment::Center)
+                    .borders(Borders::ALL),
+            );
+        f.render_widget(next_piece_table, piece_info_section[0]);
 
         let mut held_piece_field = game.playfield.clone().map(|row| row.map(|_cell| 0));
         match game.held_piece {
@@ -720,65 +776,7 @@ pub fn draw_game(
                     .title_alignment(tui::layout::Alignment::Center)
                     .borders(Borders::ALL),
             );
-        f.render_widget(held_piece_table, piece_info_section[0]);
-
-        let mut next_piece_field = game.playfield.clone().map(|row| row.map(|_cell| 0));
-        let piece = game.get_next_piece_in_queue(false);
-        let points = piece.get_piece_points().unwrap();
-        for point in points {
-            next_piece_field[(point.0 - piece.center.0 + 3) as usize]
-                [(point.1 - piece.center.1 + 4) as usize] = piece.color;
-        }
-        let next_piece_rows = next_piece_field.map(|row| {
-            Row::new(row.map(|el| {
-                let color = match el {
-                    // Pieces
-                    n if n.rem_euclid(10) == 1 => Color::Cyan,
-                    n if n.rem_euclid(10) == 2 => Color::Blue,
-                    n if n.rem_euclid(10) == 3 => Color::Red,
-                    n if n.rem_euclid(10) == 4 => Color::Yellow,
-                    n if n.rem_euclid(10) == 5 => Color::Green,
-                    n if n.rem_euclid(10) == 6 => Color::Magenta,
-                    n if n.rem_euclid(10) == 7 => Color::LightRed,
-                    // Pieces already placed
-                    n if n.rem_euclid(10) == 8 => Color::DarkGray,
-                    // Ghost piece
-                    // Empty tile
-                    n if n.rem_euclid(10) == 0 => Color::Black,
-                    _ => Color::White,
-                };
-                Cell::from("").style(Style::default().bg(color))
-            }))
-        });
-        let next_piece_table = Table::new(next_piece_rows)
-            // You can set the style of the entire Table.
-            .style(Style::default().fg(Color::White))
-            // As any other widget, a Table can be wrapped in a Block.
-            // Columns widths are constrained in the same way as Layout...
-            .widths(&[
-                Constraint::Length(2),
-                Constraint::Length(2),
-                Constraint::Length(2),
-                Constraint::Length(2),
-                Constraint::Length(2),
-                Constraint::Length(2),
-                Constraint::Length(2),
-                Constraint::Length(2),
-                Constraint::Length(2),
-                Constraint::Length(2),
-                Constraint::Length(2),
-                Constraint::Length(2),
-                Constraint::Length(2),
-            ])
-            .column_spacing(0)
-            .highlight_style(Style::default().add_modifier(Modifier::BOLD))
-            .block(
-                Block::default()
-                    .title("Next piece")
-                    .title_alignment(tui::layout::Alignment::Center)
-                    .borders(Borders::ALL),
-            );
-        f.render_widget(next_piece_table, piece_info_section[2]);
+        f.render_widget(held_piece_table, piece_info_section[2]);
 
         let field_rows = game.playfield.map(|row| {
             Row::new(row.map(|el| {
