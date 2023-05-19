@@ -1,11 +1,6 @@
-use blockbuster::{
+use blockstorm::{
     draw_game, draw_game_over, Event, Game, MinoesError, OutOfBoundsError, OverlappingMinoesError,
     DOWN,
-};
-use crossterm::{
-    event::DisableMouseCapture,
-    execute,
-    terminal::{disable_raw_mode, LeaveAlternateScreen},
 };
 use std::{
     io,
@@ -54,7 +49,7 @@ fn main() {
             Event::MovePiece(direction) => {
                 if !game_ended {
                     match direction {
-                        blockbuster::TetrisDirection::Down => {}
+                        blockstorm::TetrisDirection::Down => {}
                         _ => {
                             last_piece_move = Instant::now();
                         }
@@ -101,12 +96,5 @@ fn main() {
             draw_game(&mut terminal, &mut game).unwrap();
         }
     }
-    disable_raw_mode().unwrap();
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )
-    .unwrap();
     terminal.show_cursor().unwrap();
 }

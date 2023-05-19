@@ -1,12 +1,18 @@
 [package]
-name = "blockbuster"
+name = "blockstorm"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+description = "A Tetris CLI game with TUI"
+repository = "https://github.com/crpier/blockstorm/"
+keywords = ["cli", "game", "tetris", "terminal", "tui"]
+readme = "README.md"
+categories = ["games", "command-line-interface"]
+exclude = ["static"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-crossterm = "0.26.1"
 rand = "0.8.5"
 ruscii = "0.3.2"
 termion = "2.0.1"
