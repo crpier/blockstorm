@@ -20,12 +20,13 @@ fn main() {
     let mut terminal = Terminal::new(backend).unwrap();
     terminal.clear().unwrap();
     let mut last_piece_move = Instant::now();
+    let mut game_paused = false;
 
     loop {
         let event = game.event_receiver.recv().unwrap();
         match event {
             Event::TimePassed => {
-                if !game_ended {
+                if !game_ended && !game_paused{
                     match game.move_moving_piece(DOWN) {
                         Ok(_) => (),
                         Err(OutOfBoundsError) => {
@@ -90,6 +91,9 @@ fn main() {
                         Err(_) => (),
                     };
                 }
+            }
+            Event::TogglePause => {
+                game_paused = !game_paused;
             }
         }
         if !game_ended {

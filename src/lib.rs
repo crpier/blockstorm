@@ -247,6 +247,7 @@ pub enum Event {
     RotatePiece(Rotation),
     HardDropPiece,
     HoldPiece,
+    TogglePause,
     Quit,
 }
 
@@ -330,6 +331,11 @@ impl Default for Game {
                     Ok(Key::Char('c')) => {
                         key_sender
                             .send(Event::HoldPiece)
+                            .expect("Could not send message");
+                    }
+                    Ok(Key::Char('p')) => {
+                        key_sender
+                            .send(Event::TogglePause)
                             .expect("Could not send message");
                     }
 
