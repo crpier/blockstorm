@@ -94,11 +94,14 @@ pub enum MinoesError {
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Piece {
+    piece_type: PieceType,
     center: Point,
     current_rotation_id: usize,
     rotations: [[RelPoint; 3]; 4],
     pub color: i16,
 }
+
+#[derive(Clone, Debug, Copy)]
 pub enum PieceType {
     // Clockwise,
     I,
@@ -108,6 +111,12 @@ pub enum PieceType {
     S,
     T,
     Z,
+}
+
+impl Default for PieceType {
+    fn default() -> PieceType {
+        PieceType::I
+    }
 }
 
 impl Piece {
@@ -177,6 +186,7 @@ impl Piece {
             }
         };
         Piece {
+            piece_type,
             center,
             current_rotation_id: 0,
             rotations: [pos_0, pos_1, pos_2, pos_3],
@@ -256,6 +266,7 @@ pub struct Game {
     pub event_receiver: Receiver<Event>,
     pub ghost_piece: Option<Piece>,
     pub held_piece: Option<Piece>,
+    pub hold_used: bool,
     pub level: u16,
     pub lines_cleared: u16,
     pub moving_piece: Piece,
@@ -360,6 +371,7 @@ impl Default for Game {
             event_receiver,
             ghost_piece: None,
             held_piece: None,
+            hold_used: false,
             level: 1,
             lines_cleared: 0,
             moving_piece: next_pieces.pop().unwrap(),
@@ -581,6 +593,7 @@ impl Game {
         self.adjust_score(cleared_lines_count);
         let next_piece = self.get_next_piece_in_queue(true);
         self.add_piece_to_field(next_piece)?;
+        self.hold_used = false;
         return Ok(());
     }
 
@@ -591,7 +604,7 @@ impl Game {
             Some(piece) => {
                 let old_held_piece = piece;
                 self.held_piece = Some(self.moving_piece.clone());
-                self.moving_piece = old_held_piece;
+                self.moving_piece = Piece::new(old_held_piece.piece_type);
             }
             None => {
                 self.held_piece = Some(self.moving_piece.clone());
@@ -600,6 +613,7 @@ impl Game {
         }
         self.fill_piece_points(&self.moving_piece.clone()).unwrap();
         self.add_piece_to_field(self.moving_piece)?;
+        self.hold_used = true;
         return Ok(());
     }
 
@@ -919,6 +933,8 @@ pub fn draw_game_over(
                 game.score.to_string(),
                 Style::default().fg(Color::Red),
             )),
+            Spans::from(""),
+            Spans::from("Press q to quit"),
         ])
         .style(Style::default().fg(Color::White))
         .alignment(Alignment::Center)

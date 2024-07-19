@@ -26,7 +26,7 @@ fn main() {
         let event = game.event_receiver.recv().unwrap();
         match event {
             Event::TimePassed => {
-                if !game_ended && !game_paused{
+                if !game_ended && !game_paused {
                     match game.move_moving_piece(DOWN) {
                         Ok(_) => (),
                         Err(OutOfBoundsError) => {
@@ -46,7 +46,10 @@ fn main() {
                     };
                 }
             }
-            Event::Quit => break,
+            Event::Quit => {
+                terminal.clear().unwrap();
+                break;
+            }
             Event::MovePiece(direction) => {
                 if !game_ended {
                     match direction {
@@ -86,10 +89,12 @@ fn main() {
             Event::HoldPiece => {
                 last_piece_move = Instant::now();
                 if !game_ended {
-                    match game.hold_moving_piece() {
-                        Ok(_) => (),
-                        Err(_) => (),
-                    };
+                    if !game.hold_used {
+                        match game.hold_moving_piece() {
+                            Ok(_) => (),
+                            Err(_) => (),
+                        };
+                    }
                 }
             }
             Event::TogglePause => {
