@@ -880,7 +880,14 @@ pub fn draw_game(
         ];
         let score_section = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(10), Constraint::Min(0)].as_ref())
+            .constraints(
+                [
+                    Constraint::Length(10),
+                    Constraint::Min(0),
+                    Constraint::Length(11),
+                ]
+                .as_ref(),
+            )
             .split(chunks[2]);
         let score_paragraph = Paragraph::new(text)
             .style(Style::default().fg(Color::White))
@@ -892,8 +899,50 @@ pub fn draw_game(
                     .title_alignment(Alignment::Center)
                     .borders(Borders::ALL),
             );
-
         f.render_widget(score_paragraph, score_section[0]);
+
+        let button_style = Style::default()
+            .fg(Color::Yellow)
+            .add_modifier(Modifier::ITALIC);
+        let help_text = vec![
+            Spans::from(vec![Span::raw("")]),
+            Spans::from(vec![
+                Span::styled("K", button_style),
+                Span::raw(" - Rotate"),
+            ]),
+            Spans::from(vec![
+                Span::styled("H", button_style),
+                Span::raw(" - Move left"),
+            ]),
+            Spans::from(vec![
+                Span::styled("L", button_style),
+                Span::raw(" - Move right"),
+            ]),
+            Spans::from(vec![
+                Span::styled("J", button_style),
+                Span::raw(" - Move down"),
+            ]),
+            Spans::from(vec![
+                Span::styled("D", button_style),
+                Span::raw(" - Hard drop"),
+            ]),
+            Spans::from(vec![
+                Span::styled("C", button_style),
+                Span::raw(" - Hold piece"),
+            ]),
+        ];
+        let help_paragraph = Paragraph::new(help_text)
+            .style(Style::default().fg(Color::White))
+            .alignment(Alignment::Left)
+            .wrap(Wrap { trim: true })
+            .block(
+                Block::default()
+                    .title("Buttons")
+                    .title_alignment(Alignment::Center)
+                    .borders(Borders::ALL),
+            );
+
+        f.render_widget(help_paragraph, score_section[2]);
     })?;
     Ok(())
 }
