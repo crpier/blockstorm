@@ -39,7 +39,31 @@ pub const DOWN: TetrisDirection = TetrisDirection::Down;
 pub const LEFT: TetrisDirection = TetrisDirection::Left;
 pub const RIGHT: TetrisDirection = TetrisDirection::Right;
 
-pub const KICKS: [(i16, i16); 5] = [(0, 0), (-1, 0), (-1, 1), (0, -2), (-1, -2)];
+pub const KICKS: [(i16, i16); 20] = [
+    (0, 0),
+    (0, 1),
+    (0, -1),
+    (0, -2),
+    (0, 2),
+    //
+    (1, 0),
+    (1, 1),
+    (1, -1),
+    (1, -2),
+    (1, 2),
+    //
+    (-1, 0),
+    (-1, 1),
+    (-1, -1),
+    (-1, -2),
+    (-1, 2),
+    //
+    (2, 0),
+    (2, 1),
+    (2, -1),
+    (2, -2),
+    (2, 2),
+];
 
 #[derive(Debug)]
 pub enum Rotation {
@@ -129,7 +153,7 @@ impl Piece {
         let color: i16;
         match piece_type {
             PieceType::I => {
-                center = Point(1, 5);
+                center = Point(0, 5);
                 pos_0 = [RelPoint(0, -2), RelPoint(0, -1), RelPoint(0, 1)];
                 pos_1 = [RelPoint(-2, 0), RelPoint(-1, 0), RelPoint(1, 0)];
                 pos_2 = [RelPoint(0, -2), RelPoint(0, -1), RelPoint(0, 1)];
